@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Hospital warehouse issues and stock">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Warehouse">
+  <meta name="theme-color" content="#00796B">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>Warehouse</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { margin: 0; background: #F4FBF9; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+               font: 18px -apple-system, sans-serif; color: #00796B; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading warehouse…</div>
+  <script>
+    // Offline support: sw.js caches the whole app after the first visit.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('No offline support', e); });
+    }
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

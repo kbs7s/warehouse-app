@@ -1,0 +1,17 @@
+{
+  "name": "Warehouse — قسم التجهيز",
+  "short_name": "Warehouse",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#F4FBF9",
+  "theme_color": "#00796B",
+  "description": "Hospital warehouse issues and stock",
+  "orientation": "any",
+  "icons": [
+    {"src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/Icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/Icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "icons/Icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
