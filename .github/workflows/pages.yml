@@ -1,8 +1,5 @@
 name: Publish to GitHub Pages
 
-# The current app (branch main) is published at the site root.
-# The new version under test (branch v2) is published at /v2/, with its own saved data.
-# Pages only accepts deploys started from main, so after pushing v2 run this workflow on main.
 on:
   push:
     branches: [main]
@@ -22,35 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-          path: main
-      - uses: actions/checkout@v4
-        with:
-          ref: v2
-          path: v2
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.5
           channel: stable
-      - name: Build current app
-        working-directory: main
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
-          python3 tool/make_sw.py
-      - name: Build v2 test version
-        working-directory: v2
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/v2/"
-          python3 tool/make_sw.py
-          cp -r build/web ../main/build/web/v2
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+      - run: python3 tool/make_sw.py
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: main/build/web
+          path: build/web
   deploy:
     needs: build
     runs-on: ubuntu-latest
