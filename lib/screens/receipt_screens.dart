@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../pdf.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 import 'item_picker.dart';
@@ -31,7 +32,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Issue receipts')),
+      appBar: AppBar(title: const Text('Issue receipts'), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openReceipt(context, store, null),
         icon: const Icon(Icons.add),
@@ -236,11 +237,12 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   Widget _lineRow(int i, _Line l) {
     final item = store.item(l.itemId);
     final avail = _available(l.itemId);
+    final phone = isPhone(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(children: [
-          SizedBox(width: 32, child: Text('${i + 1}', style: const TextStyle(color: Colors.grey))),
+          if (!phone) SizedBox(width: 32, child: Text('${i + 1}', style: const TextStyle(color: Colors.grey))),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               NameText(item?.name ?? l.itemId, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
@@ -249,7 +251,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
             ]),
           ),
           SizedBox(
-            width: 120,
+            width: phone ? 84 : 120,
             child: TextField(
               controller: l.qty,
               autofocus: l.qty.text.isEmpty,
@@ -258,7 +260,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
               decoration: const InputDecoration(labelText: 'Qty', border: OutlineInputBorder(), isDense: true),
             ),
           ),
-          SizedBox(width: 90, child: Padding(padding: const EdgeInsets.only(left: 8), child: NameText(item?.unit ?? ''))),
+          SizedBox(width: phone ? 56 : 90, child: Padding(padding: const EdgeInsets.only(left: 8), child: NameText(item?.unit ?? ''))),
           IconButton(
               tooltip: 'Remove',
               icon: const Icon(Icons.close),

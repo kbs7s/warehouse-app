@@ -59,6 +59,27 @@ class Ledger {
   num get stockValue => layers.values.expand((l) => l).fold<num>(0, (s, l) => s + l.valueLeft);
   num itemValue(String itemId) => (layers[itemId] ?? const []).fold<num>(0, (s, l) => s + l.valueLeft);
 
+  /// What selling [qty] more of an item now would cost, taking the oldest layers first.
+  num estimateCost(String itemId, num qty) {
+    var need = qty;
+    num cost = 0;
+    final q = layers[itemId] ?? const <CostLayer>[];
+    for (final l in q) {
+      if (need <= 0) break;
+      final take = need < l.qtyLeft ? need : l.qtyLeft;
+      cost += take * l.unitCost;
+      need -= take;
+    }
+    if (need > 0 && q.isNotEmpty) cost += need * q.last.unitCost;
+    return cost;
+  }
+
+  /// Unit cost of the newest layer still in stock, if any.
+  num? latestUnitCost(String itemId) {
+    final q = layers[itemId];
+    return q == null || q.isEmpty ? null : q.last.unitCost;
+  }
+
   static Ledger build({
     required List<Item> items,
     required List<Purchase> purchases,

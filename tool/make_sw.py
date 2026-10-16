@@ -37,6 +37,9 @@ self.addEventListener('fetch', (e) => {{
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   if (req.mode === 'navigate') {{
+    // Only this app's own page: another version published in a sub-folder (e.g. v2/) has its own worker.
+    const path = new URL(req.url).pathname, scope = new URL(self.registration.scope).pathname;
+    if (path !== scope && path !== scope + 'index.html') return;
     e.respondWith(fetch(req).then((res) => {{
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put('./', copy));

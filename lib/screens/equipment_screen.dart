@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 
@@ -11,7 +12,7 @@ class EquipmentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Surgery equipment')),
+        appBar: AppBar(title: const Text('Surgery equipment'), bottom: SubNav.bar(context)),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(context, null),
           icon: const Icon(Icons.add),

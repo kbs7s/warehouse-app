@@ -16,6 +16,8 @@ class WarehouseStore extends ChangeNotifier {
 
   final Database? _db;
   static final _record = StoreRef<String, String>.main().record('warehouse');
+  // Device-only settings (the Claude API key). Kept apart so they never go into backup files.
+  static final _deviceRecord = StoreRef<String, String>.main().record('device');
 
   List<Item> items = [];
   List<String> departments = [];
@@ -32,6 +34,7 @@ class WarehouseStore extends ChangeNotifier {
   String companyName = '';
   String? source;
   String? lastBackupAt; // when a backup file was last exported
+  String apiKey = ''; // Claude API key, stored only on this device
 
   Map<String, StockInfo> _stock = {};
   Ledger ledger = Ledger.build(items: [], purchases: [], receipts: [], invoices: []);
@@ -44,13 +47,25 @@ class WarehouseStore extends ChangeNotifier {
   Future<void> load() async {
     final saved = _db == null ? null : await _record.get(_db);
     if (saved != null) applyJson(jsonDecode(saved) as Map<String, dynamic>, save: false);
+    final device = _db == null ? null : await _deviceRecord.get(_db);
+    if (device != null) apiKey = ((jsonDecode(device) as Map<String, dynamic>)['apiKey'] as String?) ?? '';
+  }
+
+  Future<void> setApiKey(String key) async {
+    apiKey = key.trim();
+    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'apiKey': apiKey}));
+    notifyListeners();
   }
 
   void startEmpty() => applyJson({'format': 'warehouse-backup', 'version': 1, 'source': 'Started empty'});
 
   /// Deletes everything on this device and goes back to the welcome screen.
   Future<void> eraseAll() async {
-    if (_db != null) await _record.delete(_db);
+    if (_db != null) {
+      await _record.delete(_db);
+      await _deviceRecord.delete(_db);
+    }
+    apiKey = '';
     items = [];
     departments = [];
     customers = [];
@@ -158,6 +173,10 @@ class WarehouseStore extends ChangeNotifier {
         for (final l in r.lines)
           if (l.itemId == itemId)
             (date: r.date, kind: 'Issue', party: r.department ?? '', no: r.no, qty: -l.qty),
+      for (final inv in invoices)
+        for (final l in inv.lines)
+          if (l.itemId == itemId)
+            (date: inv.date, kind: 'Invoice', party: client(inv.clientId)?.name ?? '', no: inv.no, qty: -l.qty),
     ];
     out.sort((a, b) => (b.date ?? '').compareTo(a.date ?? ''));
     return out;

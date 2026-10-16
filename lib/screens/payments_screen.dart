@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 import 'item_picker.dart';
@@ -30,7 +31,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     num sum(num Function(Payment) f) => all.fold<num>(0, (s, p) => s + f(p));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Supplier payments')),
+      appBar: AppBar(title: const Text('Supplier payments'), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),
