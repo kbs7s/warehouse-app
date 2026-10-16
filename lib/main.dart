@@ -12,10 +12,13 @@ export 'theme.dart' show buildTheme;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 'business' (not v1's 'warehouse') so the new version never touches the old app's data on the same site.
+  // 'business' (not v1's 'warehouse') so the new version never changes the old app's data.
+  // On first start, the old app's data is copied over from 'warehouse'.
   final db = await databaseFactoryWeb.openDatabase('business');
   final store = WarehouseStore(db);
-  await store.load();
+  final legacy = await databaseFactoryWeb.openDatabase('warehouse');
+  await store.load(legacy: legacy);
+  await legacy.close();
   requestPersistentStorage();
   runApp(BusinessApp(store: store));
 }

@@ -8,7 +8,7 @@ final _qtyFmt = intl.NumberFormat('#,##0.##', 'en');
 final _moneyFmt = intl.NumberFormat('#,##0', 'en');
 
 String fmtQty(num q) => _qtyFmt.format(q);
-String fmtMoney(num m) => '${_moneyFmt.format(m)} IQD';
+String fmtMoney(num m) => '${_moneyFmt.format(m == 0 ? 0 : m)} IQD'; // never "-0"
 String fmtDate(String? iso) {
   if (iso == null) return '—';
   final d = DateTime.tryParse(iso);

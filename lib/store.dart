@@ -44,9 +44,17 @@ class WarehouseStore extends ChangeNotifier {
 
   /// Loads the data saved on this device, if any. The Excel data is not bundled with the app
   /// (it contains staff names and phone numbers); it is loaded once from a file instead.
-  Future<void> load() async {
+  ///
+  /// [legacy] is the first version's database. When this device has nothing saved yet, its data
+  /// is copied in once; the old database itself is left as it was.
+  Future<void> load({Database? legacy}) async {
     final saved = _db == null ? null : await _record.get(_db);
-    if (saved != null) applyJson(jsonDecode(saved) as Map<String, dynamic>, save: false);
+    if (saved != null) {
+      applyJson(jsonDecode(saved) as Map<String, dynamic>, save: false);
+    } else if (legacy != null) {
+      final old = await _record.get(legacy);
+      if (old != null) applyJson(jsonDecode(old) as Map<String, dynamic>);
+    }
     final device = _db == null ? null : await _deviceRecord.get(_db);
     if (device != null) apiKey = ((jsonDecode(device) as Map<String, dynamic>)['apiKey'] as String?) ?? '';
   }
