@@ -2,9 +2,10 @@ name: Publish to GitHub Pages
 
 # The current app (branch main) is published at the site root.
 # The new version under test (branch v2) is published at /v2/, with its own saved data.
+# Pages only accepts deploys started from main, so after pushing v2 run this workflow on main.
 on:
   push:
-    branches: [main, v2]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
