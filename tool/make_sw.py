@@ -26,7 +26,7 @@ const CACHE = PREFIX + '{version}';
 const FILES = {json.dumps(['./'] + files)};
 
 self.addEventListener('install', (e) => {{
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, {{ cache: 'reload' }})))).then(() => self.skipWaiting()));
 }});
 
 self.addEventListener('activate', (e) => {{
@@ -38,6 +38,8 @@ self.addEventListener('activate', (e) => {{
 }});
 
 // Page loads: try the network first so updates arrive, fall back to the cache when offline.
+// Both the page and the install step skip the browser's HTTP cache, so a new version never
+// gets saved with files from the old one.
 // Everything else: cache first.
 self.addEventListener('fetch', (e) => {{
   const req = e.request;
@@ -46,7 +48,7 @@ self.addEventListener('fetch', (e) => {{
     // Only this app's own page: another version published in a sub-folder (e.g. v2/) has its own worker.
     const path = new URL(req.url).pathname, scope = new URL(self.registration.scope).pathname;
     if (path !== scope && path !== scope + 'index.html') return;
-    e.respondWith(fetch(req).then((res) => {{
+    e.respondWith(fetch(req.url, {{ cache: 'no-cache' }}).then((res) => {{
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put('./', copy));
       return res;

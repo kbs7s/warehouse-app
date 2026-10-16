@@ -2,8 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../export.dart';
 import '../models.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
+
+PreferredSizeWidget _bottom(BuildContext context) {
+  final nav = SubNav.bar(context);
+  const tabs = TabBar(tabs: [Tab(text: 'Monthly use'), Tab(text: 'By department'), Tab(text: 'Reorder list')]);
+  if (nav == null) return tabs;
+  return PreferredSize(
+    preferredSize: Size.fromHeight(nav.preferredSize.height + tabs.preferredSize.height),
+    child: Column(children: [nav, tabs]),
+  );
+}
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key, required this.store});
@@ -25,7 +36,7 @@ class ReportsScreen extends StatelessWidget {
                 ),
               ),
             ],
-            bottom: const TabBar(tabs: [Tab(text: 'Monthly use'), Tab(text: 'By department'), Tab(text: 'Reorder list')]),
+            bottom: _bottom(context),
           ),
           body: TabBarView(children: [
             _MonthlyUse(store: store),

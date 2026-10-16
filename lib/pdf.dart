@@ -116,3 +116,96 @@ Future<void> shareReceiptPdf(WarehouseStore store, Receipt r) => Printing.layout
       name: 'Receipt-${r.no}.pdf',
       onLayout: (_) => buildReceiptPdf(store, r),
     );
+
+Future<Uint8List> buildInvoicePdf(WarehouseStore store, Invoice inv) async {
+  final doc = pw.Document(theme: await _pdfTheme(), title: 'Invoice ${inv.no}');
+  const cell = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5);
+  final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold);
+  final client = store.client(inv.clientId);
+  const grey = pw.TextStyle(color: PdfColors.grey700);
+
+  pw.Widget total(String label, String value, {bool strong = false}) => pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 3),
+        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+          pw.SizedBox(width: 120, child: pw.Text(label, style: strong ? bold : grey)),
+          pw.SizedBox(width: 120, child: pw.Text(value, style: strong ? bold : null, textAlign: pw.TextAlign.right)),
+        ]),
+      );
+
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(36),
+    header: (_) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text('INVOICE', style: pw.TextStyle(fontSize: 26, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF0F766E))),
+        _name(store.companyName.isEmpty ? ' ' : store.companyName, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+      ]),
+      pw.Divider(color: PdfColors.grey400),
+    ]),
+    footer: (c) => pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text('Invoice #${inv.no} · page ${c.pageNumber} of ${c.pagesCount}',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600))),
+    build: (_) => [
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('Bill to', style: grey),
+            _name(client?.name ?? '—', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            for (final x in [?client?.phone, ?client?.email, ?client?.address]) _name(x),
+          ]),
+        ),
+        pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+          pw.Text('Invoice #${inv.no}', style: bold),
+          pw.Text('Date: ${fmtDate(inv.date)}'),
+          if (inv.dueDate != null) pw.Text('Pay by: ${fmtDate(inv.dueDate)}'),
+        ]),
+      ]),
+      pw.SizedBox(height: 18),
+      pw.Table(
+        border: pw.TableBorder(horizontalInside: pw.BorderSide(color: PdfColors.grey300, width: .5)),
+        columnWidths: const {
+          0: pw.FixedColumnWidth(24),
+          1: pw.FlexColumnWidth(),
+          2: pw.FixedColumnWidth(55),
+          3: pw.FixedColumnWidth(90),
+          4: pw.FixedColumnWidth(100),
+        },
+        children: [
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            children: [
+              for (final (i, h) in ['#', 'Description', 'Qty', 'Price', 'Amount'].indexed)
+                pw.Padding(padding: cell, child: pw.Text(h, style: bold, textAlign: i >= 2 ? pw.TextAlign.right : null)),
+            ],
+          ),
+          for (final (i, l) in inv.lines.indexed)
+            pw.TableRow(children: [
+              pw.Padding(padding: cell, child: pw.Text('${i + 1}')),
+              pw.Padding(
+                  padding: cell,
+                  child: _name(l.itemId == null ? (l.description ?? '') : (store.item(l.itemId!)?.name ?? l.itemId!))),
+              pw.Padding(padding: cell, child: pw.Text(fmtQty(l.qty), textAlign: pw.TextAlign.right)),
+              pw.Padding(padding: cell, child: pw.Text(fmtQty(l.unitPrice), textAlign: pw.TextAlign.right)),
+              pw.Padding(padding: cell, child: pw.Text(fmtQty(l.total), textAlign: pw.TextAlign.right)),
+            ]),
+        ],
+      ),
+      pw.SizedBox(height: 12),
+      total('Subtotal', fmtMoney(inv.subtotal)),
+      if (inv.discount != 0) total('Discount', '-${fmtMoney(inv.discount)}'),
+      total('Total', fmtMoney(inv.total), strong: true),
+      if (inv.paid > 0) total('Paid', fmtMoney(inv.paid)),
+      if (inv.paid > 0) total('Balance due', fmtMoney(inv.balance), strong: true),
+      if (inv.note != null) ...[pw.SizedBox(height: 18), _name(inv.note!)],
+      pw.SizedBox(height: 30),
+      pw.Text('Thank you for your business.', style: grey),
+    ],
+  ));
+  return doc.save();
+}
+
+Future<void> shareInvoicePdf(WarehouseStore store, Invoice inv) => Printing.layoutPdf(
+      name: 'Invoice-${inv.no}.pdf',
+      onLayout: (_) => buildInvoicePdf(store, inv),
+    );

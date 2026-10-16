@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 
 class ItemDetailScreen extends StatelessWidget {
@@ -15,6 +16,9 @@ class ItemDetailScreen extends StatelessWidget {
         builder: (context, _) {
           final s = store.stock(itemId);
           final moves = store.movements(itemId);
+          final layers = store.ledger.layers[itemId] ?? const [];
+          final value = store.ledger.itemValue(itemId);
+          final t = Theme.of(context);
           return Scaffold(
             appBar: AppBar(
               title: NameText(s.item.name),
@@ -23,60 +27,68 @@ class ItemDetailScreen extends StatelessWidget {
                     onPressed: () => editItem(context, store, s.item),
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit')),
+                const SizedBox(width: 8),
               ],
             ),
-            body: ListView(padding: const EdgeInsets.all(16), children: [
-              Wrap(spacing: 12, runSpacing: 12, children: [
-                _Stat('In stock', '${fmtQty(s.qty)} ${s.item.unit}', trailing: StatusChip(s.status)),
-                _Stat('Opening', fmtQty(s.item.openingQty)),
-                _Stat('Bought', fmtQty(s.bought)),
-                _Stat('Issued', fmtQty(s.issued)),
-                _Stat('Minimum', fmtQty(s.item.minLevel)),
-                _Stat('Code', s.item.id),
+            body: PageBody(maxWidth: 900, children: [
+              TileGrid(children: [
+                MetricTile(label: 'In stock', value: '${fmtQty(s.qty)} ${s.item.unit}', icon: Icons.inventory_2_outlined,
+                    color: s.status == StockStatus.inStock ? null : (s.status == StockStatus.low ? AppColors.warn : AppColors.bad),
+                    hint: 'Minimum ${fmtQty(s.item.minLevel)}'),
+                MetricTile(label: 'Stock value', value: fmtMoneyShort(value), icon: Icons.layers_outlined, hint: 'What it cost you'),
+                MetricTile(label: 'Sold', value: fmtQty(s.sold), icon: Icons.sell_outlined,
+                    hint: s.item.salePrice == null ? 'No usual price set' : 'Usual price ${fmtMoney(s.item.salePrice!)}'),
+                MetricTile(label: 'Given to departments', value: fmtQty(s.issued), icon: Icons.outbox_outlined,
+                    hint: 'Opening ${fmtQty(s.item.openingQty)} · bought ${fmtQty(s.bought)}'),
               ]),
               if (s.item.note != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Note: ${s.item.note}')),
-              const SizedBox(height: 24),
-              Text('Movements', style: Theme.of(context).textTheme.titleLarge),
+              SectionTitle('Cost layers', trailing: Text(s.item.id, style: t.textTheme.bodySmall)),
+              Text('Each batch you bought keeps its own price. Sales and issues use the oldest batch first.',
+                  style: t.textTheme.bodySmall!.copyWith(color: t.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 8),
-              if (moves.isEmpty) const Text('No purchases or issues yet.'),
-              for (final m in moves)
-                ListTile(
-                  leading: Icon(m.qty > 0 ? Icons.south_west : Icons.north_east,
-                      color: m.qty > 0 ? Colors.green : Colors.blueGrey),
-                  title: Row(children: [
-                    Text('${m.kind} #${m.no}  ·  '),
-                    Flexible(child: NameText(m.party)),
-                  ]),
-                  subtitle: Text(fmtDate(m.date)),
-                  trailing: Text((m.qty > 0 ? '+' : '') + fmtQty(m.qty),
-                      style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600, color: m.qty > 0 ? Colors.green : null)),
-                ),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  if (layers.isEmpty) const ListTile(title: Text('Nothing left in stock.')),
+                  for (final (i, l) in layers.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      leading: CircleAvatar(
+                          backgroundColor: t.colorScheme.primaryContainer.withValues(alpha: 1 - i * .15 < .3 ? .3 : 1 - i * .15),
+                          child: Text('${i + 1}', style: TextStyle(color: t.colorScheme.onPrimaryContainer))),
+                      title: NameText(l.source, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text('${fmtQty(l.qtyLeft)} of ${fmtQty(l.qtyIn)} left · ${fmtMoney(l.unitCost)} each'
+                          '${l.date == null ? '' : ' · ${fmtDate(l.date)}'}'
+                          '${l.estimatedCost ? (l.unitCost == 0 ? ' · cost unknown' : ' · estimated cost') : ''}'),
+                      trailing: Text(fmtMoney(l.valueLeft), style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ]),
+              ),
+              const SectionTitle('Movements'),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  if (moves.isEmpty) const ListTile(title: Text('No purchases, sales or issues yet.')),
+                  for (final (i, m) in moves.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      leading: Icon(m.qty > 0 ? Icons.south_west : Icons.north_east,
+                          color: m.qty > 0 ? AppColors.good : (m.kind == 'Invoice' ? AppColors.info : Colors.blueGrey)),
+                      title: Row(children: [
+                        Text('${m.kind} #${m.no}  ·  '),
+                        Flexible(child: NameText(m.party)),
+                      ]),
+                      subtitle: Text(fmtDate(m.date)),
+                      trailing: Text((m.qty > 0 ? '+' : '') + fmtQty(m.qty),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: m.qty > 0 ? AppColors.good : null)),
+                    ),
+                  ],
+                ]),
+              ),
             ]),
           );
         },
-      );
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat(this.label, this.value, {this.trailing});
-  final String label;
-  final String value;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: TextStyle(color: Colors.grey.shade700)),
-            const SizedBox(height: 4),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              NameText(value, style: Theme.of(context).textTheme.titleLarge),
-              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-            ]),
-          ]),
-        ),
       );
 }
 
@@ -103,6 +115,8 @@ class _ItemFormState extends State<_ItemForm> {
   late final _opening = TextEditingController(text: fmtQty(widget.item?.openingQty ?? 0));
   late final _min = TextEditingController(text: fmtQty(widget.item?.minLevel ?? 0));
   late final _note = TextEditingController(text: widget.item?.note);
+  late final _sale = TextEditingController(text: widget.item?.salePrice?.round().toString());
+  late final _openCost = TextEditingController(text: widget.item?.openingUnitCost?.toString());
   late bool _active = widget.item?.active ?? true;
 
   @override
@@ -110,6 +124,7 @@ class _ItemFormState extends State<_ItemForm> {
     final isNew = widget.item == null;
     final units = {for (final i in widget.store.items) i.unit}.where((u) => u.isNotEmpty).toList()..sort();
     String? numCheck(String? v) => parseNum(v ?? '') == null ? 'Enter a number' : null;
+    String? optNum(String? v) => (v ?? '').trim().isEmpty ? null : numCheck(v);
 
     return AlertDialog(
       title: Text(isNew ? 'New item' : 'Edit item'),
@@ -170,6 +185,21 @@ class _ItemFormState extends State<_ItemForm> {
                         keyboardType: TextInputType.number,
                         validator: numCheck)),
               ]),
+              Row(children: [
+                Expanded(
+                    child: TextFormField(
+                        controller: _sale,
+                        decoration: const InputDecoration(labelText: 'Usual selling price (IQD)', helperText: 'Suggested on invoices'),
+                        keyboardType: TextInputType.number,
+                        validator: optNum)),
+                const SizedBox(width: 16),
+                Expanded(
+                    child: TextFormField(
+                        controller: _openCost,
+                        decoration: const InputDecoration(labelText: 'Cost of each opening unit', helperText: 'Empty = first purchase price'),
+                        keyboardType: TextInputType.number,
+                        validator: optNum)),
+              ]),
               TextFormField(controller: _note, decoration: const InputDecoration(labelText: 'Note')),
               if (!isNew)
                 SwitchListTile(
@@ -197,6 +227,8 @@ class _ItemFormState extends State<_ItemForm> {
               category: widget.item?.category,
               active: _active,
               note: note.isEmpty ? null : note,
+              salePrice: parseNum(_sale.text),
+              openingUnitCost: parseNum(_openCost.text),
             ));
             Navigator.pop(context);
           },

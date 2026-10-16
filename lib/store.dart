@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:sembast/sembast.dart';
 
+import 'ledger.dart';
 import 'models.dart';
 
 /// Holds all warehouse data in memory and saves it to the device after every change.
@@ -15,6 +16,8 @@ class WarehouseStore extends ChangeNotifier {
 
   final Database? _db;
   static final _record = StoreRef<String, String>.main().record('warehouse');
+  // Device-only settings (the Claude API key). Kept apart so they never go into backup files.
+  static final _deviceRecord = StoreRef<String, String>.main().record('device');
 
   List<Item> items = [];
   List<String> departments = [];
@@ -24,27 +27,53 @@ class WarehouseStore extends ChangeNotifier {
   List<Purchase> purchases = [];
   List<HistoryRow> history = []; // Excel Year sheet, read-only
   List<Equipment> equipment = [];
-  List<Payment> payments = [];
+  List<Payment> payments = []; // supplier bills
+  List<Client> clients = [];
+  List<Invoice> invoices = [];
+  List<Expense> expenses = [];
+  String companyName = '';
   String? source;
   String? lastBackupAt; // when a backup file was last exported
+  String apiKey = ''; // Claude API key, stored only on this device
 
   Map<String, StockInfo> _stock = {};
+  Ledger ledger = Ledger.build(items: [], purchases: [], receipts: [], invoices: []);
 
   /// True once data has been loaded from a file or the user chose to start empty.
   bool started = false;
 
   /// Loads the data saved on this device, if any. The Excel data is not bundled with the app
   /// (it contains staff names and phone numbers); it is loaded once from a file instead.
-  Future<void> load() async {
+  ///
+  /// [legacy] is the first version's database. When this device has nothing saved yet, its data
+  /// is copied in once; the old database itself is left as it was.
+  Future<void> load({Database? legacy}) async {
     final saved = _db == null ? null : await _record.get(_db);
-    if (saved != null) applyJson(jsonDecode(saved) as Map<String, dynamic>, save: false);
+    if (saved != null) {
+      applyJson(jsonDecode(saved) as Map<String, dynamic>, save: false);
+    } else if (legacy != null) {
+      final old = await _record.get(legacy);
+      if (old != null) applyJson(jsonDecode(old) as Map<String, dynamic>);
+    }
+    final device = _db == null ? null : await _deviceRecord.get(_db);
+    if (device != null) apiKey = ((jsonDecode(device) as Map<String, dynamic>)['apiKey'] as String?) ?? '';
+  }
+
+  Future<void> setApiKey(String key) async {
+    apiKey = key.trim();
+    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'apiKey': apiKey}));
+    notifyListeners();
   }
 
   void startEmpty() => applyJson({'format': 'warehouse-backup', 'version': 1, 'source': 'Started empty'});
 
   /// Deletes everything on this device and goes back to the welcome screen.
   Future<void> eraseAll() async {
-    if (_db != null) await _record.delete(_db);
+    if (_db != null) {
+      await _record.delete(_db);
+      await _deviceRecord.delete(_db);
+    }
+    apiKey = '';
     items = [];
     departments = [];
     customers = [];
@@ -54,6 +83,10 @@ class WarehouseStore extends ChangeNotifier {
     history = [];
     equipment = [];
     payments = [];
+    clients = [];
+    invoices = [];
+    expenses = [];
+    companyName = '';
     source = null;
     lastBackupAt = null;
     started = false;
@@ -75,6 +108,10 @@ class WarehouseStore extends ChangeNotifier {
     history = list('history').map(HistoryRow.fromJson).toList();
     equipment = list('equipment').map(Equipment.fromJson).toList();
     payments = list('payments').map(Payment.fromJson).toList();
+    clients = list('clients').map(Client.fromJson).toList();
+    invoices = list('invoices').map(Invoice.fromJson).toList();
+    expenses = list('expenses').map(Expense.fromJson).toList();
+    companyName = (j['companyName'] as String?) ?? '';
     source = j['source'] as String?;
     lastBackupAt = j['lastBackupAt'] as String?;
     started = true;
@@ -83,7 +120,8 @@ class WarehouseStore extends ChangeNotifier {
 
   Map<String, dynamic> toJson() => {
         'format': 'warehouse-backup',
-        'version': 1,
+        'version': 2,
+        'companyName': companyName,
         'source': source,
         'lastBackupAt': lastBackupAt,
         'savedAt': DateTime.now().toIso8601String(),
@@ -96,6 +134,9 @@ class WarehouseStore extends ChangeNotifier {
         'history': [for (final h in history) h.toJson()],
         'equipment': [for (final e in equipment) e.toJson()],
         'payments': [for (final p in payments) p.toJson()],
+        'clients': [for (final c in clients) c.toJson()],
+        'invoices': [for (final i in invoices) i.toJson()],
+        'expenses': [for (final e in expenses) e.toJson()],
       };
 
   void _changed({bool save = true}) {
@@ -111,7 +152,14 @@ class WarehouseStore extends ChangeNotifier {
         issued[l.itemId] = (issued[l.itemId] ?? 0) + l.qty;
       }
     }
-    _stock = {for (final i in items) i.id: StockInfo(i, bought[i.id] ?? 0, issued[i.id] ?? 0)};
+    final sold = <String, num>{};
+    for (final inv in invoices) {
+      for (final l in inv.lines) {
+        if (l.itemId != null) sold[l.itemId!] = (sold[l.itemId!] ?? 0) + l.qty;
+      }
+    }
+    _stock = {for (final i in items) i.id: StockInfo(i, bought[i.id] ?? 0, issued[i.id] ?? 0, sold[i.id] ?? 0)};
+    ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
   }
@@ -133,6 +181,10 @@ class WarehouseStore extends ChangeNotifier {
         for (final l in r.lines)
           if (l.itemId == itemId)
             (date: r.date, kind: 'Issue', party: r.department ?? '', no: r.no, qty: -l.qty),
+      for (final inv in invoices)
+        for (final l in inv.lines)
+          if (l.itemId == itemId)
+            (date: inv.date, kind: 'Invoice', party: client(inv.clientId)?.name ?? '', no: inv.no, qty: -l.qty),
     ];
     out.sort((a, b) => (b.date ?? '').compareTo(a.date ?? ''));
     return out;
@@ -257,6 +309,78 @@ class WarehouseStore extends ChangeNotifier {
     }
     return out;
   }
+
+  // ---------- Billing ----------
+
+  Client? client(String? id) => id == null ? null : clients.where((c) => c.id == id).firstOrNull;
+  int get nextInvoiceNo => invoices.fold<int>(0, (m, i) => i.no > m ? i.no : m) + 1;
+  String newId(String prefix) => '$prefix${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+
+  void saveClient(Client c) {
+    final i = clients.indexWhere((x) => x.id == c.id);
+    i < 0 ? clients.add(c) : clients[i] = c;
+    _changed();
+  }
+
+  /// Clients with invoices cannot be deleted (their history would be lost).
+  bool deleteClient(String id) {
+    if (invoices.any((i) => i.clientId == id)) return false;
+    clients.removeWhere((c) => c.id == id);
+    _changed();
+    return true;
+  }
+
+  void saveInvoice(Invoice inv, {int? replacingNo}) {
+    invoices.removeWhere((x) => x.no == (replacingNo ?? inv.no));
+    invoices.add(inv);
+    invoices.sort((a, b) => a.no.compareTo(b.no));
+    _changed();
+  }
+
+  void deleteInvoice(int no) {
+    invoices.removeWhere((i) => i.no == no);
+    _changed();
+  }
+
+  void addInvoicePayment(int invoiceNo, InvoicePayment p) {
+    invoices.firstWhere((i) => i.no == invoiceNo).payments.add(p);
+    _changed();
+  }
+
+  List<Invoice> invoicesOf(String clientId) => [for (final i in invoices) if (i.clientId == clientId) i];
+  num owedBy(String clientId) => invoicesOf(clientId).fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
+  num get owedToUs => invoices.fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
+  num get weOwe => payments.fold<num>(0, (s, p) => s + (p.remaining > 0 ? p.remaining : 0));
+  List<Invoice> overdue(String today) => [for (final i in invoices) if (i.status(today) == InvoiceStatus.overdue) i];
+
+  void saveExpense(Expense e) {
+    final i = expenses.indexWhere((x) => x.id == e.id);
+    i < 0 ? expenses.add(e) : expenses[i] = e;
+    expenses.sort((a, b) => a.date.compareTo(b.date));
+    _changed();
+  }
+
+  void deleteExpense(String id) {
+    expenses.removeWhere((e) => e.id == id);
+    _changed();
+  }
+
+  List<String> get expenseCategories {
+    final seen = {for (final e in expenses) e.category};
+    return {...seen, 'Rent', 'Salaries', 'Electricity', 'Transport', 'Maintenance', 'Other'}.toList();
+  }
+
+  void setCompanyName(String name) {
+    companyName = name.trim();
+    _changed();
+  }
+
+  /// Plain-words money summary for a period.
+  ProfitReport profit(String from, String to) =>
+      ledger.report(from: from, to: to, invoices: invoices, receipts: receipts, expenses: expenses);
+
+  /// Cost of one invoice line's stock (0 for services).
+  num invoiceLineCost(int invoiceNo, int line) => ledger.lineCost['inv:$invoiceNo:$line'] ?? 0;
 
   void _remember({String? department, String? customer}) {
     final d = department?.trim();

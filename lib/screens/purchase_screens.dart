@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 import 'item_picker.dart';
@@ -29,9 +30,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Purchases')),
+      appBar: AppBar(title: const Text('Purchases'), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _open(context, null),
+        onPressed: () => openPurchase(context, widget.store, null),
         icon: const Icon(Icons.add),
         label: const Text('New purchase'),
       ),
@@ -52,7 +53,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   title: NameText(p.supplier ?? 'No supplier', style: const TextStyle(fontSize: 17)),
                   subtitle: Text('${fmtDate(p.date)}  ·  ${p.lines.length} items'),
                   trailing: Text(fmtMoney(p.total), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  onTap: () => _open(context, p),
+                  onTap: () => openPurchase(context, widget.store, p),
                 );
               },
             ),
@@ -62,9 +63,11 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     );
   }
 
-  void _open(BuildContext context, Purchase? p) => Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => PurchaseEditor(store: widget.store, existing: p), fullscreenDialog: true));
+
 }
+
+void openPurchase(BuildContext context, WarehouseStore store, Purchase? p) => Navigator.of(context)
+    .push(MaterialPageRoute(builder: (_) => PurchaseEditor(store: store, existing: p), fullscreenDialog: true));
 
 class _Line {
   _Line(PurchaseLine l)
@@ -181,11 +184,9 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
           TextField(
               controller: _note, decoration: const InputDecoration(labelText: 'Note', border: OutlineInputBorder())),
           const SizedBox(height: 24),
-          Row(children: [
+          Wrap(spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
             Text('Items', style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
             Text('Total: ${fmtMoney(_grandTotal)}', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(width: 16),
             FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Add item')),
           ]),
           const SizedBox(height: 8),
@@ -210,27 +211,41 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
             ),
           ),
         );
+    final phone = isPhone(context);
+    final name = Expanded(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        NameText(item?.name ?? l.itemId, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+        Row(children: [
+          Text('${l.itemId}  ·  '),
+          NameText(item?.unit ?? ''),
+          if (l.note != null) ...[const Text('  ·  '), Flexible(child: NameText(l.note!))],
+        ]),
+      ]),
+    );
+    final remove = IconButton(
+        tooltip: 'Remove', icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i)));
     return Card(
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(children: [
-          SizedBox(width: 32, child: Text('${i + 1}', style: const TextStyle(color: Colors.grey))),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              NameText(item?.name ?? l.itemId, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-              Row(children: [
-                Text('${l.itemId}  ·  '),
-                NameText(item?.unit ?? ''),
-                if (l.note != null) ...[const Text('  ·  '), Flexible(child: NameText(l.note!))],
+        child: phone
+            ? Column(children: [
+                Row(children: [name, remove]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Expanded(child: field(l.qty, 'Qty', double.infinity, onChanged: () => _recalc(l))),
+                  Expanded(child: field(l.price, 'Unit price', double.infinity, onChanged: () => _recalc(l))),
+                  Expanded(child: field(l.total, 'Total', double.infinity)),
+                ]),
+              ])
+            : Row(children: [
+                SizedBox(width: 32, child: Text('${i + 1}', style: const TextStyle(color: Colors.grey))),
+                name,
+                field(l.qty, 'Qty', 100, onChanged: () => _recalc(l)),
+                field(l.price, 'Unit price', 130, onChanged: () => _recalc(l)),
+                field(l.total, 'Total (IQD)', 150),
+                remove,
               ]),
-            ]),
-          ),
-          field(l.qty, 'Qty', 100, onChanged: () => _recalc(l)),
-          field(l.price, 'Unit price', 130, onChanged: () => _recalc(l)),
-          field(l.total, 'Total (IQD)', 150),
-          IconButton(
-              tooltip: 'Remove', icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i))),
-        ]),
       ),
     );
   }

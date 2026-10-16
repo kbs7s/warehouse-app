@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../export.dart';
 import '../platform/files.dart';
+import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 
@@ -36,8 +37,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _erase(BuildContext context) async {
-    if (!await confirm(context, 'Erase all data on this iPad?',
-        'Every item, receipt, purchase and payment is deleted. Export a backup first if unsure.',
+    if (!await confirm(context, 'Erase all data on this device?',
+        'Every item, invoice, client, purchase, expense and payment is deleted. Export a backup first if unsure.',
         action: 'Erase')) {
       return;
     }
@@ -49,15 +50,19 @@ class SettingsScreen extends StatelessWidget {
     final last = store.lastBackupAt == null ? null : DateTime.tryParse(store.lastBackupAt!);
     final days = last == null ? null : DateTime.now().difference(last).inDays;
     return Scaffold(
-      appBar: AppBar(title: const Text('Backup & settings')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      appBar: AppBar(title: const Text('Backup & settings'), bottom: SubNav.bar(context)),
+      body: PageBody(maxWidth: 860, children: [
+        _BusinessCard(store: store),
+        const SizedBox(height: 12),
+        _AiCard(store: store),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Backup', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text('Your data is saved only on this iPad. Export a backup at least once a week and keep it in '
+              Text('Your data is saved only on this device. Export a backup at least once a week and keep it in '
                   'Files or iCloud Drive, so nothing is lost if Safari data is cleared.'),
               const SizedBox(height: 8),
               Text(last == null ? 'No backup exported yet.' : 'Last backup: ${fmtDate(store.lastBackupAt)} ($days days ago)',
@@ -79,6 +84,7 @@ class SettingsScreen extends StatelessWidget {
             ]),
           ),
         ),
+        const SizedBox(height: 12),
         Card(
           child: ListTile(
             title: const Text('Data'),
@@ -89,6 +95,101 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+class _BusinessCard extends StatefulWidget {
+  const _BusinessCard({required this.store});
+  final WarehouseStore store;
+
+  @override
+  State<_BusinessCard> createState() => _BusinessCardState();
+}
+
+class _BusinessCardState extends State<_BusinessCard> {
+  late final _name = TextEditingController(text: widget.store.companyName);
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Your business', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: _name,
+                  builder: (_, _) => TextField(
+                    controller: _name,
+                    textDirection: dirOf(_name.text),
+                    decoration: const InputDecoration(labelText: 'Business name (shown on invoices)'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonal(
+                onPressed: () {
+                  widget.store.setCompanyName(_name.text);
+                  toast(context, 'Saved.');
+                },
+                child: const Text('Save'),
+              ),
+            ]),
+          ]),
+        ),
+      );
+}
+
+class _AiCard extends StatefulWidget {
+  const _AiCard({required this.store});
+  final WarehouseStore store;
+
+  @override
+  State<_AiCard> createState() => _AiCardState();
+}
+
+class _AiCardState extends State<_AiCard> {
+  final _key = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final has = widget.store.apiKey.isNotEmpty;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Claude assistant', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(has
+              ? 'Chat is on. Key ending in …${widget.store.apiKey.substring(widget.store.apiKey.length - 4)} is stored only on this device, '
+                  'never in backups.'
+              : 'Paste an Anthropic API key to chat with Claude about your figures. The offline insights work without it.'),
+          const SizedBox(height: 12),
+          Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            SizedBox(
+              width: 340,
+              child: TextField(
+                controller: _key,
+                obscureText: true,
+                decoration: InputDecoration(labelText: has ? 'Replace key' : 'API key', hintText: 'sk-ant-…'),
+              ),
+            ),
+            FilledButton.tonal(
+              onPressed: () async {
+                if (!_key.text.trim().startsWith('sk-')) return toast(context, 'That does not look like an API key.');
+                await widget.store.setApiKey(_key.text);
+                _key.clear();
+                if (context.mounted) toast(context, 'Key saved on this device.');
+              },
+              child: const Text('Save key'),
+            ),
+            if (has)
+              TextButton(onPressed: () => widget.store.setApiKey(''), child: const Text('Remove key')),
+          ]),
+        ]),
+      ),
     );
   }
 }

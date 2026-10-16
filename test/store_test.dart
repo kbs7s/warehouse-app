@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sembast/sembast_memory.dart';
 import 'package:warehouse_app/models.dart';
 import 'package:warehouse_app/store.dart';
 
@@ -78,5 +79,22 @@ void main() {
     await s.eraseAll();
     expect(s.started, isFalse);
     expect(s.items, isEmpty);
+  });
+
+  test('first start copies the old app\'s data once and leaves it unchanged', () async {
+    final legacy = await databaseFactoryMemory.openDatabase('warehouse');
+    final seed = File('seed/app_seed.json').readAsStringSync();
+    await StoreRef<String, String>.main().record('warehouse').put(legacy, seed);
+    final db = await databaseFactoryMemory.openDatabase('business');
+    final s = WarehouseStore(db);
+    await s.load(legacy: legacy);
+    expect(s.started, isTrue);
+    expect(s.stock('P001').qty, 510);
+    s.saveClient(Client(id: 'c1', name: 'Test'));
+    await Future<void>.delayed(Duration.zero);
+    final again = WarehouseStore(db);
+    await again.load(legacy: legacy);
+    expect(again.clients.single.name, 'Test');
+    expect(await StoreRef<String, String>.main().record('warehouse').get(legacy), seed);
   });
 }

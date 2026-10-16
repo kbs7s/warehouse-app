@@ -17,40 +17,89 @@ class WelcomeScreen extends StatelessWidget {
     try {
       store.applyJson(jsonDecode(text) as Map<String, dynamic>);
     } catch (e) {
-      if (context.mounted) toast(context, 'That file is not a warehouse data file.');
+      if (context.mounted) toast(context, 'That file is not a data file or backup from this app.');
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.inventory_2_outlined, size: 72),
-                const SizedBox(height: 16),
-                const Text('قسم التجهيز', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const Text('Warehouse issues & stock', style: TextStyle(fontSize: 18)),
-                const SizedBox(height: 32),
-                const Text(
-                  'Load your data file to begin: the Excel import (app_seed.json) or a backup you exported. '
-                  'Your data is then kept on this iPad.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () => _load(context),
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Load data file'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(onPressed: store.startEmpty, child: const Text('Start with an empty warehouse')),
-              ]),
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    Widget point(IconData i, String title, String text) => Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: t.colorScheme.primaryContainer,
+            child: Icon(i, size: 18, color: t.colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(text, style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(18)),
+                      child: const Icon(Icons.inventory_2, color: Colors.white, size: 34),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Run your business\nwithout bookkeeping',
+                    style: t.textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 24),
+                  point(Icons.receipt_long, 'Bill clients', 'Invoices, part payments and who owes you what.'),
+                  point(
+                    Icons.layers_outlined,
+                    'Know your stock value',
+                    'Every purchase is a cost layer; the oldest is used first.',
+                  ),
+                  point(Icons.savings_outlined, 'See your real profit', 'In plain words, by month, with an assistant to ask.'),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => _load(context),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Load data file or backup'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(onPressed: store.startEmpty, child: const Text('Start fresh')),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Your data stays on this device. Export a backup from Settings each week.',
+                    textAlign: TextAlign.center,
+                    style: t.textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
