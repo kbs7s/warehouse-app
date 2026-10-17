@@ -4,14 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:warehouse_app/claude.dart';
 import 'package:warehouse_app/l10n.dart';
 import 'package:warehouse_app/main.dart';
+import 'package:warehouse_app/month.dart';
 import 'package:warehouse_app/models.dart';
 import 'package:warehouse_app/pdf.dart';
-import 'package:warehouse_app/screens/assistant_screen.dart';
 import 'package:warehouse_app/store.dart';
 
 void main() {
@@ -149,7 +146,7 @@ void main() {
         ('Issue', <String>[]),
         ('Stock', ['Items', 'Reorder', 'Purchases', 'Reports']),
         ('Money', ['Overview', 'Invoices', 'Clients', 'Expenses', 'Supplier bills']),
-        ('Assistant', <String>[]),
+        ('Month', <String>[]),
         ('Home', <String>[]),
       ]) {
         await go(t, section);
@@ -180,7 +177,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('صرف إلى قسم'), findsWidgets);
       expect(Directionality.of(t.element(find.byType(HomeShell))), TextDirection.rtl);
-      for (final section in ['الصرف', 'المخزون', 'المالية', 'المساعد', 'الرئيسية']) {
+      for (final section in ['الصرف', 'المخزون', 'الشهر', 'المالية', 'الرئيسية']) {
         await t.tap(find.text(section).last);
         await t.pumpAndSettle();
       }
@@ -188,30 +185,47 @@ void main() {
     });
   }
 
-  testWidgets('assistant sends the question with business data and shows the answer', (t) async {
-    ipad(t);
-    late Map<String, dynamic> sent;
-    final client = ClaudeClient('sk-test', client: MockClient((req) async {
-      sent = jsonDecode(req.body) as Map<String, dynamic>;
-      expect(req.headers['anthropic-dangerous-direct-browser-access'], 'true');
-      return http.Response(jsonEncode({
-        'content': [
-          {'type': 'text', 'text': 'You made a small profit this month.'}
-        ]
-      }), 200);
-    }));
-    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: AssistantScreen(store: store, client: client)));
-    await t.tap(find.text('How did the business do this month?'));
-    await t.pumpAndSettle();
-    expect(find.text('You made a small profit this month.'), findsOneWidget);
-    expect(sent['model'], ClaudeClient.model);
-    expect(sent['system'] as String, contains('Stock (code, name'));
-    expect((sent['messages'] as List).single['content'], 'How did the business do this month?');
+  test('month spend starts again after closing the month, stock carries over', () {
+    store.setOpenMonthStart('2026-09-01');
+    final before = store.stock('P001').qty;
+    final sept = store.spentThisMonth['P001'] ?? 0;
+    expect(sept, greaterThan(0));
+    final rows = store.monthRows('2026-09-01', '2026-09-30');
+    final p001 = rows.firstWhere((r) => r.itemId == 'P001');
+    expect(p001.issued, sept);
+    expect(p001.closing, before); // nothing after September in the seed
+
+    final m = store.closeMonth(to: '2026-09-30');
+    expect(m.rows.firstWhere((r) => r.itemId == 'P001').issued, sept);
+    expect(store.openMonthStart, '2026-10-01');
+    expect(store.spentThisMonth['P001'] ?? 0, 0);
+    expect(store.stock('P001').qty, before);
+    expect(store.spentThisYear['P001'], greaterThanOrEqualTo(sept));
+
+    // Saved in backups, and reopening takes the close back.
+    final copy = WarehouseStore(null)..applyJson(jsonDecode(jsonEncode(store.toJson())) as Map<String, dynamic>, save: false);
+    expect(copy.monthCloses.single.to, '2026-09-30');
+    expect(copy.openMonthStart, '2026-10-01');
+    store.reopenLastMonth();
+    expect(store.monthCloses, isEmpty);
+    expect(store.openMonthStart, '2026-09-01');
   });
 
-  test('API key is never written to backups', () async {
-    await store.setApiKey('sk-ant-secret');
-    expect(jsonEncode(store.toJson()), isNot(contains('sk-ant-secret')));
+  testWidgets('month page closes the month from the button', (t) async {
+    ipad(t);
+    store.setOpenMonthStart('2026-09-01');
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Month');
+    expect(find.text('Since 1 Sep 2026'), findsOneWidget);
+    await t.tap(find.text('Close month & start new'));
+    await t.pumpAndSettle();
+    expect(find.text('1 Sep 2026 – 30 Sep 2026'), findsOneWidget);
+    await t.tap(find.widgetWithText(FilledButton, 'Close month'));
+    await t.pumpAndSettle();
+    expect(store.monthCloses.single.from, '2026-09-01');
+    expect(find.text('September 2026'), findsOneWidget);
+    expect(find.text('Since 1 Oct 2026'), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 
   test('receipt and invoice PDFs build with Arabic names', () async {

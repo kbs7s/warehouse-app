@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../export.dart' show avgMonthlyUse;
 import '../l10n.dart';
 import '../models.dart';
+import '../month.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
@@ -60,9 +61,12 @@ class ItemDetailScreen extends StatelessWidget {
                               : s.qty < avg
                                   ? tx('Lasts less than a month', 'يكفي أقل من شهر')
                                   : tx('Lasts about ${fmtQty((s.qty / avg * 10).round() / 10)} months', 'يكفي قرابة ${fmtQty((s.qty / avg * 10).round() / 10)} شهر')),
-                MetricTile(label: tx('Given to departments', 'المصروف إلى الأقسام'), value: fmtQty(s.issued), icon: Icons.outbox_outlined,
-                    hint: tx('Opening ${fmtQty(s.item.openingQty)} · bought ${fmtQty(s.bought)}',
-                        'الافتتاحي ${fmtQty(s.item.openingQty)} · المشترى ${fmtQty(s.bought)}')),
+                MetricTile(
+                    label: tx('Spent this month', 'مصروف الشهر'),
+                    value: fmtQty(store.spentThisMonth[itemId] ?? 0),
+                    icon: Icons.outbox_outlined,
+                    hint: tx('This year ${fmtQty(store.spentThisYear[itemId] ?? 0)} · all time ${fmtQty(s.issued + s.sold)}',
+                        'هذه السنة ${fmtQty(store.spentThisYear[itemId] ?? 0)} · الكلي ${fmtQty(s.issued + s.sold)}')),
               ]),
               if (s.item.note != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tx('Note: ${s.item.note}', 'ملاحظة: ${s.item.note}'))),
               SectionTitle(tx('Cost layers', 'دفعات الكلفة'), trailing: Text(s.item.id, style: t.textTheme.bodySmall)),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../insights.dart';
 import '../l10n.dart';
 import '../models.dart';
+import '../month.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -32,7 +33,8 @@ class HomeScreen extends StatelessWidget {
     final t = Theme.of(context);
     final w = MediaQuery.sizeOf(context).width;
     final wide = w >= 900;
-    final (from, to) = Period.thisMonth.range();
+    // "This month" is the open month on the Month page, so it starts again after each month-end close.
+    final (from, to) = (s.openMonthStart, '9999-12-31');
 
     final all = s.stockList;
     final low = all.where((x) => x.status == StockStatus.low).length;

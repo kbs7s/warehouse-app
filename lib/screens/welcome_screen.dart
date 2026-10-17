@@ -85,7 +85,7 @@ class WelcomeScreen extends StatelessWidget {
                     tx('Live stock, low-stock warnings and a ready order list.', 'مخزون محدّث، تنبيه عند النقص، وقائمة طلب جاهزة.'),
                   ),
                   point(Icons.insights_outlined, tx('See where supplies go', 'اعرف أين تذهب المواد'),
-                      tx('Use by department and month, with an assistant to ask.', 'الاستهلاك حسب القسم والشهر، مع مساعد تسأله.')),
+                      tx('Spend by month and year, with a month-end close.', 'الصرف الشهري والسنوي، مع إغلاق نهاية الشهر.')),
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => _load(context),

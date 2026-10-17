@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../models.dart';
+import '../month.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
@@ -29,6 +30,8 @@ class _StockScreenState extends State<StockScreen> {
         .where((s) => q.isEmpty || s.item.name.toLowerCase().contains(q) || s.item.id.toLowerCase().contains(q))
         .toList();
     int count(StockStatus st) => all.where((s) => s.status == st).length;
+    final month = store.spentThisMonth, year = store.spentThisYear;
+    final spendCols = MediaQuery.sizeOf(context).width >= 900;
 
     return Scaffold(
       appBar: AppBar(title: Text(tx('Stock', 'المخزون')), bottom: SubNav.bar(context)),
@@ -66,10 +69,13 @@ class _StockScreenState extends State<StockScreen> {
         ],
         itemCount: rows.isEmpty ? 0 : rows.length + 1,
         itemBuilder: (_, i) => i == 0
-            ? _HeaderRow(phone: isPhone(context))
+            ? _HeaderRow(phone: isPhone(context), spend: spendCols)
             : _StockRow(
                 rows[i - 1],
                 phone: isPhone(context),
+                spend: spendCols,
+                month: month[rows[i - 1].item.id] ?? 0,
+                year: year[rows[i - 1].item.id] ?? 0,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -102,11 +108,11 @@ class _FilterChip extends StatelessWidget {
   );
 }
 
-const _cols = [70.0, null, 110.0, 90.0, 80.0, 84.0];
+const _cols = [70.0, null, 110.0, 90.0, 80.0, 84.0, 90.0, 90.0];
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.phone});
-  final bool phone;
+  const _HeaderRow({required this.phone, required this.spend});
+  final bool phone, spend;
   @override
   Widget build(BuildContext context) {
     final s = Theme.of(context).textTheme.labelLarge!.copyWith(color: Colors.grey.shade700);
@@ -134,6 +140,16 @@ class _HeaderRow extends StatelessWidget {
               width: _cols[4],
               child: Text(tx('Min', 'الحد الأدنى'), style: s, textAlign: TextAlign.end),
             ),
+          if (spend)
+            SizedBox(
+              width: _cols[6],
+              child: Text(tx('This month', 'صرف الشهر'), style: s, textAlign: TextAlign.end),
+            ),
+          if (spend)
+            SizedBox(
+              width: _cols[7],
+              child: Text(tx('This year', 'صرف السنة'), style: s, textAlign: TextAlign.end),
+            ),
           SizedBox(
             width: _cols[5],
             child: Text(tx('Status', 'الحالة'), style: s, textAlign: TextAlign.center),
@@ -145,8 +161,10 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _StockRow extends StatelessWidget {
-  const _StockRow(this.s, {required this.onTap, required this.phone});
+  const _StockRow(this.s, {required this.onTap, required this.phone, required this.spend, this.month = 0, this.year = 0});
+  final bool spend; // room for the spend columns
   final StockInfo s;
+  final num month, year; // spent in the open month and since 1 January
   final bool phone;
   final VoidCallback onTap;
 
@@ -170,7 +188,13 @@ class _StockRow extends StatelessWidget {
                   alignment: AlignmentDirectional.centerStart,
                   child: NameText(s.item.name, style: const TextStyle(fontSize: 16.5)),
                 ),
-                if (phone) Text('${s.item.id} · ${s.item.unit}', style: const TextStyle(color: Colors.grey, fontSize: 12.5)),
+                if (!spend && (phone || month != 0))
+                  Text(
+                      [
+                        if (phone) '${s.item.id} · ${s.item.unit}',
+                        if (month != 0) tx('spent ${fmtQty(month)} this month', 'صُرف ${fmtQty(month)} هذا الشهر'),
+                      ].join(' · '),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12.5)),
               ],
             ),
           ),
@@ -187,6 +211,16 @@ class _StockRow extends StatelessWidget {
             SizedBox(
               width: _cols[4],
               child: Text(fmtQty(s.item.minLevel), textAlign: TextAlign.end),
+            ),
+          if (spend)
+            SizedBox(
+              width: _cols[6],
+              child: Text(month == 0 ? '·' : fmtQty(month), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          if (spend)
+            SizedBox(
+              width: _cols[7],
+              child: Text(year == 0 ? '·' : fmtQty(year), textAlign: TextAlign.end, style: const TextStyle(color: Colors.grey)),
             ),
           SizedBox(
             width: _cols[5],

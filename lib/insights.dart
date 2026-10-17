@@ -107,33 +107,3 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
   out.sort((a, b) => a.level.index.compareTo(b.level.index));
   return out;
 }
-
-/// A compact text snapshot of the business, given to the Claude assistant as context.
-String businessSnapshot(WarehouseStore s, {DateTime? now}) {
-  final n = now ?? DateTime.now();
-  final b = StringBuffer()
-    ..writeln('Business: ${s.companyName.isEmpty ? '(unnamed)' : s.companyName}. Currency: IQD. Today: ${isoDate(n)}.');
-  for (var i = 5; i >= 0; i--) {
-    final from = DateTime(n.year, n.month - i), to = DateTime(n.year, n.month - i + 1, 0);
-    final r = s.profit(isoDate(from), isoDate(to));
-    b.writeln('Month ${isoDate(from).substring(0, 7)}: sales ${r.sales}, cost of goods sold ${r.costOfSales}, '
-        'supplies used internally ${r.suppliesUsed}, expenses ${r.expenses} ${r.expensesByCategory}, profit ${r.profit}, cash received ${r.received}.');
-  }
-  b.writeln('Stock value now (FIFO): ${s.ledger.stockValue.round()}. Clients owe us: ${s.owedToUs}. We owe suppliers: ${s.weOwe}.');
-  b.writeln('Clients (name: balance owed, invoices):');
-  for (final c in s.clients) {
-    b.writeln('- ${c.name}: ${s.owedBy(c.id)}, ${s.invoicesOf(c.id).length} invoices');
-  }
-  final today = isoDate(n);
-  b.writeln('Unpaid invoices (no, client, date, due, total, balance, status):');
-  for (final i in s.invoices.where((i) => i.balance > 0)) {
-    b.writeln('- #${i.no}, ${s.client(i.clientId)?.name}, ${i.date}, ${i.dueDate}, ${i.total}, ${i.balance}, ${i.status(today).name}');
-  }
-  b.writeln('Stock (code, name, unit, qty, min, FIFO value, status):');
-  for (final st in s.stockList) {
-    b.writeln('- ${st.item.id}, ${st.item.name}, ${st.item.unit}, ${st.qty}, ${st.item.minLevel}, '
-        '${s.ledger.itemValue(st.item.id).round()}, ${st.status.name}');
-  }
-  b.writeln('Unpaid supplier bills: ${[for (final p in s.payments) if (p.remaining > 0) '${p.supplier} ${p.remaining}'].join('; ')}');
-  return b.toString();
-}

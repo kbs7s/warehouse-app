@@ -68,7 +68,6 @@ class SettingsScreen extends StatelessWidget {
         const SizedBox(height: 12),
         _BusinessCard(store: store),
         const SizedBox(height: 12),
-        _AiCard(store: store),
         const SizedBox(height: 12),
         Card(
           child: Padding(
@@ -164,60 +163,4 @@ class _BusinessCardState extends State<_BusinessCard> {
           ]),
         ),
       );
-}
-
-class _AiCard extends StatefulWidget {
-  const _AiCard({required this.store});
-  final WarehouseStore store;
-
-  @override
-  State<_AiCard> createState() => _AiCardState();
-}
-
-class _AiCardState extends State<_AiCard> {
-  final _key = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    final has = widget.store.apiKey.isNotEmpty;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(tx('Claude assistant', 'مساعد Claude'), style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(has
-              ? tx(
-                  'Chat is on. Key ending in …${widget.store.apiKey.substring(widget.store.apiKey.length - 4)} is stored only on this device, '
-                      'never in backups.',
-                  'المحادثة مفعّلة. المفتاح المنتهي بـ …${widget.store.apiKey.substring(widget.store.apiKey.length - 4)} محفوظ على هذا الجهاز فقط، '
-                      'ولا يدخل في النسخ الاحتياطية.')
-              : tx('Paste an Anthropic API key to chat with Claude about your figures. The offline insights work without it.',
-                  'الصق مفتاح Anthropic API لتتحدث مع Claude عن أرقامك. الملاحظات بدون إنترنت تعمل من دونه.')),
-          const SizedBox(height: 12),
-          Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            SizedBox(
-              width: 340,
-              child: TextField(
-                controller: _key,
-                obscureText: true,
-                decoration: InputDecoration(labelText: has ? tx('Replace key', 'استبدال المفتاح') : tx('API key', 'مفتاح API'), hintText: 'sk-ant-…'),
-              ),
-            ),
-            FilledButton.tonal(
-              onPressed: () async {
-                if (!_key.text.trim().startsWith('sk-')) return toast(context, tx('That does not look like an API key.', 'هذا لا يبدو مفتاح API.'));
-                await widget.store.setApiKey(_key.text);
-                _key.clear();
-                if (context.mounted) toast(context, tx('Key saved on this device.', 'حُفظ المفتاح على هذا الجهاز.'));
-              },
-              child: Text(tx('Save key', 'حفظ المفتاح')),
-            ),
-            if (has)
-              TextButton(onPressed: () => widget.store.setApiKey(''), child: Text(tx('Remove key', 'إزالة المفتاح'))),
-          ]),
-        ]),
-      ),
-    );
-  }
 }

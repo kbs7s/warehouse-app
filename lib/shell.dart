@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'insights.dart';
 import 'l10n.dart';
-import 'screens/assistant_screen.dart';
 import 'screens/client_screens.dart';
 import 'screens/equipment_screen.dart';
 import 'screens/expense_screens.dart';
 import 'screens/home_screen.dart';
 import 'screens/invoice_screens.dart';
+import 'screens/month_screen.dart';
 import 'screens/payments_screen.dart';
 import 'screens/profit_screen.dart';
 import 'screens/purchase_screens.dart';
@@ -99,15 +99,15 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Purchases', 'المشتريات', (s, _) => PurchasesScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
     ]),
+    _Section('Month', 'الشهر', Icons.event_note_outlined, Icons.event_note, [
+      ('Month end', 'نهاية الشهر', (s, _) => MonthScreen(store: s)),
+    ]),
     _Section('Money', 'المالية', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
       ('Overview', 'نظرة عامة', (s, _) => ProfitScreen(store: s)),
       ('Invoices', 'الفواتير', (s, _) => InvoicesScreen(store: s)),
       ('Clients', 'الزبائن', (s, _) => ClientsScreen(store: s)),
       ('Expenses', 'المصاريف', (s, _) => ExpensesScreen(store: s)),
       ('Supplier bills', 'فواتير المجهزين', (s, _) => PaymentsScreen(store: s)),
-    ]),
-    _Section('Assistant', 'المساعد', Icons.auto_awesome_outlined, Icons.auto_awesome, [
-      ('Assistant', 'المساعد', (s, sh) => AssistantScreen(store: s, shell: sh)),
     ]),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [
       ('Equipment', 'المعدات', (s, _) => EquipmentScreen(store: s)),

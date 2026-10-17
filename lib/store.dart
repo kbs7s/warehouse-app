@@ -5,6 +5,7 @@ import 'package:sembast/sembast.dart';
 
 import 'ledger.dart';
 import 'models.dart';
+import 'month.dart';
 
 /// Holds all warehouse data in memory and saves it to the device after every change.
 ///
@@ -16,7 +17,7 @@ class WarehouseStore extends ChangeNotifier {
 
   final Database? _db;
   static final _record = StoreRef<String, String>.main().record('warehouse');
-  // Device-only settings (the Claude API key). Kept apart so they never go into backup files.
+  // Device-only settings (the interface language). Kept apart so they never go into backup files.
   static final _deviceRecord = StoreRef<String, String>.main().record('device');
 
   List<Item> items = [];
@@ -31,10 +32,11 @@ class WarehouseStore extends ChangeNotifier {
   List<Client> clients = [];
   List<Invoice> invoices = [];
   List<Expense> expenses = [];
+  List<MonthClose> monthCloses = []; // saved month ends, oldest first
+  String? monthStart; // start of the open month when set by hand (see openMonthStart)
   String companyName = '';
   String? source;
   String? lastBackupAt; // when a backup file was last exported
-  String apiKey = ''; // Claude API key, stored only on this device
   String lang = 'en'; // interface language on this device: 'en' or 'ar'
 
   Map<String, StockInfo> _stock = {};
@@ -59,14 +61,8 @@ class WarehouseStore extends ChangeNotifier {
     final device = _db == null ? null : await _deviceRecord.get(_db);
     if (device != null) {
       final j = jsonDecode(device) as Map<String, dynamic>;
-      apiKey = (j['apiKey'] as String?) ?? '';
       lang = (j['lang'] as String?) ?? 'en';
     }
-  }
-
-  Future<void> setApiKey(String key) async {
-    apiKey = key.trim();
-    await _saveDevice();
   }
 
   Future<void> setLang(String code) async {
@@ -75,7 +71,7 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   Future<void> _saveDevice() async {
-    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'apiKey': apiKey, 'lang': lang}));
+    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'lang': lang}));
     notifyListeners();
   }
 
@@ -87,7 +83,6 @@ class WarehouseStore extends ChangeNotifier {
       await _record.delete(_db);
       await _deviceRecord.delete(_db);
     }
-    apiKey = '';
     items = [];
     departments = [];
     customers = [];
@@ -100,6 +95,8 @@ class WarehouseStore extends ChangeNotifier {
     clients = [];
     invoices = [];
     expenses = [];
+    monthCloses = [];
+    monthStart = null;
     companyName = '';
     source = null;
     lastBackupAt = null;
@@ -125,6 +122,8 @@ class WarehouseStore extends ChangeNotifier {
     clients = list('clients').map(Client.fromJson).toList();
     invoices = list('invoices').map(Invoice.fromJson).toList();
     expenses = list('expenses').map(Expense.fromJson).toList();
+    monthCloses = list('monthCloses').map(MonthClose.fromJson).toList();
+    monthStart = j['monthStart'] as String?;
     companyName = (j['companyName'] as String?) ?? '';
     source = j['source'] as String?;
     lastBackupAt = j['lastBackupAt'] as String?;
@@ -151,6 +150,8 @@ class WarehouseStore extends ChangeNotifier {
         'clients': [for (final c in clients) c.toJson()],
         'invoices': [for (final i in invoices) i.toJson()],
         'expenses': [for (final e in expenses) e.toJson()],
+        'monthCloses': [for (final m in monthCloses) m.toJson()],
+        'monthStart': monthStart,
       };
 
   void _changed({bool save = true}) {
@@ -176,6 +177,12 @@ class WarehouseStore extends ChangeNotifier {
     ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
+  }
+
+  void setMonthBook(List<MonthClose> closes, String? start) {
+    monthCloses = closes;
+    monthStart = start;
+    _changed();
   }
 
   // ---------- Queries ----------
