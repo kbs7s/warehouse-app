@@ -131,10 +131,20 @@ class _ByDepartment extends StatefulWidget {
 }
 
 class _ByDepartmentState extends State<_ByDepartment> {
+  // This month, or last month while nothing has been issued yet this month.
   late DateTimeRange _range = () {
-    final now = DateTime.now();
-    return DateTimeRange(start: DateTime(now.year, now.month), end: now);
+    final p = widget.store.issuedByDepartment(Period.thisMonth.range().$1, Period.thisMonth.range().$2).isEmpty
+        ? Period.lastMonth
+        : Period.thisMonth;
+    return _rangeOf(p);
   }();
+
+  static DateTimeRange _rangeOf(Period p) {
+    final (a, b) = p.range();
+    final n = DateTime.now();
+    if (p == Period.allTime) return DateTimeRange(start: DateTime(2020), end: DateTime(n.year, n.month, n.day));
+    return DateTimeRange(start: DateTime.parse(a), end: DateTime.parse(b));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +159,14 @@ class _ByDepartmentState extends State<_ByDepartment> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: Row(children: [
+        child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          for (final p in Period.values)
+            ChoiceChip(
+              label: Text(p.label),
+              showCheckmark: false,
+              selected: _rangeOf(p) == _range,
+              onSelected: (_) => setState(() => _range = _rangeOf(p)),
+            ),
           OutlinedButton.icon(
             icon: const Icon(Icons.date_range),
             label: Text('${fmtDate(isoDate(_range.start))} – ${fmtDate(isoDate(_range.end))}'),
@@ -159,7 +176,6 @@ class _ByDepartmentState extends State<_ByDepartment> {
               if (r != null) setState(() => _range = r);
             },
           ),
-          const SizedBox(width: 16),
           Text(tx('${rows.length} items issued to ${depts.length} departments', '${rows.length} مادة صُرفت إلى ${depts.length} قسم'),
               style: const TextStyle(color: Colors.grey)),
         ]),
@@ -173,6 +189,25 @@ class _ByDepartmentState extends State<_ByDepartment> {
   }
 }
 
+/// Items that need ordering: at or under their minimum and still in use (a minimum is set or the item
+/// was issued in the last three months). Out of stock first, then the most used.
+/// With [dormant], the opposite: empty or low items nobody has used lately and with no minimum set.
+List<(StockInfo, num)> reorderList(WarehouseStore store, {bool dormant = false}) {
+  final monthly = store.monthlyIssued();
+  final now = DateTime.now();
+  final out = <(StockInfo, num)>[
+    for (final s in store.stockList)
+      if (s.status != StockStatus.inStock)
+        if (avgMonthlyUse(monthly[s.item.id], now) case final avg when (s.item.minLevel <= 0 && avg <= 0) == dormant) (s, avg),
+  ];
+  int rank(StockInfo s) => s.status == StockStatus.out ? 0 : 1;
+  out.sort((a, b) {
+    final r = rank(a.$1).compareTo(rank(b.$1));
+    return r != 0 ? r : b.$2.compareTo(a.$2);
+  });
+  return out;
+}
+
 /// Items at or under their minimum, with how much to order to cover two months.
 class ReorderScreen extends StatelessWidget {
   const ReorderScreen({super.key, required this.store});
@@ -181,10 +216,17 @@ class ReorderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final monthly = store.monthlyIssued();
-    final now = DateTime.now();
-    final list = store.stockList.where((s) => s.status != StockStatus.inStock).toList()
-      ..sort((a, b) => a.qty.compareTo(b.qty));
+    final list = reorderList(store);
+    final dormant = reorderList(store, dormant: true);
+    Widget card(List<(StockInfo, num)> l) => Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: [
+            for (final (i, (s, avg)) in l.indexed) ...[
+              if (i > 0) const Divider(height: 1),
+              _ReorderTile(store: store, s: s, avg: avg),
+            ],
+          ]),
+        );
     return Scaffold(
       appBar: AppBar(
         title: Text(tx('Reorder', 'إعادة الطلب')),
@@ -197,21 +239,21 @@ class ReorderScreen extends StatelessWidget {
       body: PageBody(children: [
         Text(
             list.isEmpty
-                ? tx('Nothing to reorder. Every item is above its minimum.', 'لا شيء يحتاج إعادة طلب. كل المواد فوق الحد الأدنى.')
-                : tx('${list.length} items are at or under their minimum level. The suggestion covers about two months of use.',
-                    '${list.length} مادة عند الحد الأدنى أو أقل. الكمية المقترحة تكفي لشهرين تقريباً.'),
+                ? tx('Nothing to reorder. Every item in use is above its minimum.', 'لا شيء يحتاج إعادة طلب. كل المواد المستخدمة فوق الحد الأدنى.')
+                : tx('${list.length} items in use are at or under their minimum, out of stock first. The suggestion covers about two months of use.',
+                    '${list.length} مادة مستخدمة عند الحد الأدنى أو أقل، النافدة أولاً. الكمية المقترحة تكفي لشهرين تقريباً.'),
             style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 12),
-        if (list.isNotEmpty)
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(children: [
-              for (final (i, s) in list.indexed) ...[
-                if (i > 0) const Divider(height: 1),
-                _ReorderTile(store: store, s: s, avg: avgMonthlyUse(monthly[s.item.id], now)),
-              ],
-            ]),
-          ),
+        if (list.isNotEmpty) card(list),
+        if (dormant.isNotEmpty) ...[
+          SectionTitle(tx('Empty, but not used lately', 'نافدة لكن غير مستخدمة مؤخراً'), trailing: Text('${dormant.length}')),
+          Text(
+              tx('No minimum is set and nothing was issued in the last three months. Set a minimum on an item to move it up.',
+                  'لا يوجد حد أدنى ولم يُصرف منها شيء خلال آخر ثلاثة أشهر. حدّد حداً أدنى للمادة لتظهر في الأعلى.'),
+              style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          card(dormant),
+        ],
       ]),
     );
   }

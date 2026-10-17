@@ -74,6 +74,18 @@ void main() {
     expect(store.stock('P001').qty, 500);
   });
 
+  testWidgets('issue form offers recent departments as one-tap chips', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Issue');
+    await t.tap(find.text('Issue supplies'));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(ActionChip, 'NICU'));
+    await t.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'NICU'), findsOneWidget);
+    expect(find.byType(ActionChip), findsNothing);
+  });
+
   testWidgets('invoice for a new client takes stock out and records a payment', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));

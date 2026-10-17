@@ -36,7 +36,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),
-        label: Text(tx('New invoice', 'فاتورة جديدة')),
+        label: Text(tx('New bill', 'قائمة مجهز جديدة')),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -12,6 +12,7 @@ import 'expense_screens.dart' show ShareBar;
 import 'item_screens.dart';
 import 'purchase_screens.dart';
 import 'receipt_screens.dart';
+import 'reports_screen.dart' show reorderList;
 import 'settings_screen.dart';
 
 /// The store's day at a glance: issue supplies, what is running low, where supplies went.
@@ -46,8 +47,7 @@ class HomeScreen extends StatelessWidget {
     const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final used = [for (final m in months) s.profit(isoDate(m), isoDate(DateTime(m.year, m.month + 1, 0))).suppliesUsed];
 
-    final reorder = all.where((x) => x.status != StockStatus.inStock).toList()
-      ..sort((a, b) => _fill(a).compareTo(_fill(b)));
+    final reorder = [for (final (x, _) in reorderList(s)) x];
     final recent = s.receipts.reversed.take(5).toList();
 
     final reorderCard = _Panel(
@@ -188,7 +188,6 @@ class HomeScreen extends StatelessWidget {
   }
 
   /// How full an item is relative to its minimum (0 = empty), for sorting the reorder list.
-  static double _fill(StockInfo x) => x.item.minLevel <= 0 ? (x.qty <= 0 ? -1 : 1) : x.qty / x.item.minLevel;
 
   void _push(BuildContext context, Widget page) =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListenableBuilder(listenable: store, builder: (_, _) => page)));

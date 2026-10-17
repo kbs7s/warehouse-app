@@ -98,6 +98,17 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   late final _note = TextEditingController(text: widget.existing?.note);
   late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? <ReceiptLine>[]) _Line(l.itemId, l.qty)];
 
+  /// The departments most recently issued to, for one-tap picking.
+  late final List<String> _recentDepts = () {
+    final seen = <String>{};
+    for (final r in store.receipts.reversed) {
+      final d = r.department?.trim() ?? '';
+      if (d.isNotEmpty) seen.add(d);
+      if (seen.length == 8) break;
+    }
+    return seen.toList();
+  }();
+
   @override
   void initState() {
     super.initState();
@@ -238,6 +249,17 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
               ),
             ],
           ),
+          if (_dept.text.trim().isEmpty && _recentDepts.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final d in _recentDepts)
+                ActionChip(
+                  avatar: const Icon(Icons.local_hospital_outlined, size: 18),
+                  label: NameText(d),
+                  onPressed: () => _dept.text = d,
+                ),
+            ]),
+          ],
           const SizedBox(height: 16),
           TextField(
             controller: _note,

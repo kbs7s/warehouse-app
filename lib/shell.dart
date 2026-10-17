@@ -202,7 +202,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
                       _Logo(color: scheme.primary),
                       const SizedBox(width: 10),
                       Expanded(
-                          child: Text(widget.store.companyName.isEmpty ? tx('My business', 'قسم التجهيز') : widget.store.companyName,
+                          child: Text(widget.store.companyName.isEmpty ? 'قسم التجهيز' : widget.store.companyName,
                               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                               overflow: TextOverflow.ellipsis)),
                     ]),

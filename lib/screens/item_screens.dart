@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../export.dart' show avgMonthlyUse;
 import '../l10n.dart';
 import '../models.dart';
 import '../store.dart';
@@ -19,6 +20,7 @@ class ItemDetailScreen extends StatelessWidget {
           final moves = store.movements(itemId);
           final layers = store.ledger.layers[itemId] ?? const [];
           final value = store.ledger.itemValue(itemId);
+          final avg = avgMonthlyUse(store.monthlyIssued()[itemId], DateTime.now());
           final t = Theme.of(context);
           return Scaffold(
             appBar: AppBar(
@@ -41,10 +43,23 @@ class ItemDetailScreen extends StatelessWidget {
                     value: fmtMoneyShort(value),
                     icon: Icons.layers_outlined,
                     hint: tx('What it cost you', 'ما كلّفك')),
-                MetricTile(label: tx('Sold', 'المباع'), value: fmtQty(s.sold), icon: Icons.sell_outlined,
-                    hint: s.item.salePrice == null
-                        ? tx('No usual price set', 'لا يوجد سعر بيع معتاد')
-                        : tx('Usual price ${fmtMoney(s.item.salePrice!)}', 'سعر البيع المعتاد ${fmtMoney(s.item.salePrice!)}')),
+                if (s.sold > 0 || s.item.salePrice != null)
+                  MetricTile(label: tx('Sold', 'المباع'), value: fmtQty(s.sold), icon: Icons.sell_outlined,
+                      hint: s.item.salePrice == null
+                          ? tx('No usual price set', 'لا يوجد سعر بيع معتاد')
+                          : tx('Usual price ${fmtMoney(s.item.salePrice!)}', 'سعر البيع المعتاد ${fmtMoney(s.item.salePrice!)}'))
+                else
+                  MetricTile(
+                      label: tx('Used per month', 'الاستهلاك الشهري'),
+                      value: '~${fmtQty(avg.round())}',
+                      icon: Icons.speed_outlined,
+                      hint: avg <= 0
+                          ? tx('Not issued in the last 3 months', 'لم يُصرف خلال آخر 3 أشهر')
+                          : s.qty <= 0
+                              ? tx('Order now', 'اطلب الآن')
+                              : s.qty < avg
+                                  ? tx('Lasts less than a month', 'يكفي أقل من شهر')
+                                  : tx('Lasts about ${fmtQty((s.qty / avg * 10).round() / 10)} months', 'يكفي قرابة ${fmtQty((s.qty / avg * 10).round() / 10)} شهر')),
                 MetricTile(label: tx('Given to departments', 'المصروف إلى الأقسام'), value: fmtQty(s.issued), icon: Icons.outbox_outlined,
                     hint: tx('Opening ${fmtQty(s.item.openingQty)} · bought ${fmtQty(s.bought)}',
                         'الافتتاحي ${fmtQty(s.item.openingQty)} · المشترى ${fmtQty(s.bought)}')),

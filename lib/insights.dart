@@ -54,8 +54,10 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
 
   if (s.weOwe > 0) {
     out.add(Insight(InsightLevel.tip, tx('You owe suppliers ${fmtMoney(s.weOwe)}', 'عليك للمجهزين ${fmtMoney(s.weOwe)}'),
-        tx('Unpaid supplier bills. Plan these payments against the money clients owe you (${fmtMoney(s.owedToUs)}).',
-            'فواتير مجهزين غير مدفوعة. خطط لدفعها مقابل ما على الزبائن لك (${fmtMoney(s.owedToUs)}).'),
+        s.owedToUs > 0
+            ? tx('Unpaid supplier bills. Plan these payments against the money clients owe you (${fmtMoney(s.owedToUs)}).',
+                'فواتير مجهزين غير مدفوعة. خطط لدفعها مقابل ما على الزبائن لك (${fmtMoney(s.owedToUs)}).')
+            : tx('Unpaid supplier bills. Open the list to see who is still owed.', 'قوائم مجهزين غير مسددة. افتح القائمة لترى لمن تبقّى مبلغ.'),
         target: InsightTarget.supplierBills));
   }
 
@@ -88,8 +90,8 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
   final estimated = s.ledger.layers.values.expand((l) => l).where((l) => l.estimatedCost && l.unitCost == 0).length;
   if (estimated > 0) {
     out.add(Insight(InsightLevel.tip, tx('$estimated items have opening stock with no cost', '$estimated مواد لها رصيد افتتاحي بدون كلفة'),
-        tx('Their stock value counts as zero. Add the cost per unit on each item so profit is accurate.',
-            'قيمتها في المخزون تُحسب صفراً. أضف كلفة الوحدة لكل مادة ليكون الربح دقيقاً.'),
+        tx('Their stock value counts as zero. Add the cost per unit on each item so stock value and costs are accurate.',
+            'قيمتها في المخزون تُحسب صفراً. أضف كلفة الوحدة لكل مادة لتكون قيمة المخزون والكلف دقيقة.'),
         target: InsightTarget.items));
   }
 
