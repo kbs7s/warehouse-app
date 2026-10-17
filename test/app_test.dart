@@ -55,8 +55,8 @@ void main() {
   testWidgets('new receipt reduces stock', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-    await go(t, 'Stock', 'Issues');
-    await t.tap(find.text('New receipt'));
+    await go(t, 'Issue');
+    await t.tap(find.text('Issue supplies'));
     await t.pumpAndSettle();
     await t.enterText(find.widgetWithText(TextField, 'Department'), 'NICU');
     await t.tap(find.text('Add item'));
@@ -75,7 +75,7 @@ void main() {
   testWidgets('invoice for a new client takes stock out and records a payment', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-    await go(t, 'Sales');
+    await go(t, 'Money', 'Invoices');
     await t.tap(find.text('New invoice').first);
     await t.pumpAndSettle();
     await t.tap(find.text('Choose client'));
@@ -129,11 +129,12 @@ void main() {
       ]));
       store.saveExpense(Expense(id: 'e1', date: '2026-10-03', category: 'Rent', amount: 300000));
       await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-      expect(find.text('Where the money went'), findsOneWidget);
+      expect(find.text('Issue to department'), findsOneWidget);
+      expect(find.text('Reorder now'), findsOneWidget);
       for (final (section, pages) in [
-        ('Sales', ['Invoices', 'Clients']),
-        ('Stock', ['Items', 'Purchases', 'Issues', 'Reports']),
-        ('Money', ['Profit', 'Expenses', 'Supplier bills']),
+        ('Issue', <String>[]),
+        ('Stock', ['Items', 'Reorder', 'Purchases', 'Reports']),
+        ('Money', ['Overview', 'Invoices', 'Clients', 'Expenses', 'Supplier bills']),
         ('Assistant', <String>[]),
         ('Home', <String>[]),
       ]) {

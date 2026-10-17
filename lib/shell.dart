@@ -86,18 +86,19 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     _Section('Home', Icons.space_dashboard_outlined, Icons.space_dashboard, [
       ('Home', (s, sh) => HomeScreen(store: s, shell: sh)),
     ]),
-    _Section('Sales', Icons.receipt_long_outlined, Icons.receipt_long, [
-      ('Invoices', (s, _) => InvoicesScreen(store: s)),
-      ('Clients', (s, _) => ClientsScreen(store: s)),
+    _Section('Issue', Icons.outbox_outlined, Icons.outbox, [
+      ('Issues', (s, _) => ReceiptsScreen(store: s)),
     ]),
     _Section('Stock', Icons.inventory_2_outlined, Icons.inventory_2, [
       ('Items', (s, _) => StockScreen(store: s)),
+      ('Reorder', (s, _) => ReorderScreen(store: s)),
       ('Purchases', (s, _) => PurchasesScreen(store: s)),
-      ('Issues', (s, _) => ReceiptsScreen(store: s)),
       ('Reports', (s, _) => ReportsScreen(store: s)),
     ]),
     _Section('Money', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
-      ('Profit', (s, _) => ProfitScreen(store: s)),
+      ('Overview', (s, _) => ProfitScreen(store: s)),
+      ('Invoices', (s, _) => InvoicesScreen(store: s)),
+      ('Clients', (s, _) => ClientsScreen(store: s)),
       ('Expenses', (s, _) => ExpensesScreen(store: s)),
       ('Supplier bills', (s, _) => PaymentsScreen(store: s)),
     ]),
@@ -113,17 +114,28 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   ];
 
   @override
-  void go(String section, [int page = 0]) => setState(() {
-        _section = _sections.indexWhere((s) => s.label == section);
-        _page[_section] = page;
-      });
+  void go(String section, [int page = 0]) {
+    final i = _sections.indexWhere((s) => s.label == section);
+    // Phones have no tab for wide-only sections (Equipment, Settings): open them as a page instead.
+    if (_sections[i].wideOnly && MediaQuery.sizeOf(context).width < 700) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ListenableBuilder(
+              listenable: widget.store, builder: (_, _) => _sections[i].pages[page].$2(widget.store, this))));
+      return;
+    }
+    setState(() {
+      _section = i;
+      _page[i] = page;
+    });
+  }
 
   @override
   void goInsight(InsightTarget t) => switch (t) {
-        InsightTarget.invoices => go('Sales'),
-        InsightTarget.stock || InsightTarget.items => go('Stock'),
+        InsightTarget.invoices => go('Money', 1),
+        InsightTarget.stock => go('Stock', 1),
+        InsightTarget.items => go('Stock'),
         InsightTarget.money => go('Money'),
-        InsightTarget.supplierBills => go('Money', 2),
+        InsightTarget.supplierBills => go('Money', 4),
         InsightTarget.settings => go('Settings'),
       };
 

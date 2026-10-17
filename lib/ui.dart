@@ -317,3 +317,43 @@ class BarChart extends StatelessWidget {
     ]);
   }
 }
+
+/// A long list inside a rounded card, width-limited, with controls (filters, search) above it.
+class CardList extends StatelessWidget {
+  const CardList({super.key, required this.header, required this.itemCount, required this.itemBuilder, this.empty = 'Nothing here yet.'});
+  final List<Widget> header;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+  final String empty;
+
+  @override
+  Widget build(BuildContext context) {
+    final pad = isPhone(context) ? 16.0 : 24.0;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(pad, 4, pad, 0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            ...header,
+            const SizedBox(height: 12),
+            Expanded(
+              child: itemCount == 0
+                  ? EmptyState(icon: Icons.search_off, title: empty)
+                  : Card(
+                      clipBehavior: Clip.antiAlias,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 88),
+                        itemCount: itemCount,
+                        separatorBuilder: (_, _) => const Divider(height: 1, indent: 16, endIndent: 16),
+                        itemBuilder: itemBuilder,
+                      ),
+                    ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}

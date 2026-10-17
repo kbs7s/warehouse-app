@@ -35,7 +35,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
     const names = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profit'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: const Text('Money'), bottom: SubNav.bar(context)),
       body: PageBody(children: [
         PeriodChips(value: _period, onChanged: (p) => setState(() => _period = p)),
         const SizedBox(height: 14),

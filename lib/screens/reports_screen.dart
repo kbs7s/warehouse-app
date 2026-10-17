@@ -5,10 +5,11 @@ import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
+import 'item_screens.dart';
 
 PreferredSizeWidget _bottom(BuildContext context) {
   final nav = SubNav.bar(context);
-  const tabs = TabBar(tabs: [Tab(text: 'Monthly use'), Tab(text: 'By department'), Tab(text: 'Reorder list')]);
+  const tabs = TabBar(tabs: [Tab(text: 'Monthly use'), Tab(text: 'By department')]);
   if (nav == null) return tabs;
   return PreferredSize(
     preferredSize: Size.fromHeight(nav.preferredSize.height + tabs.preferredSize.height),
@@ -22,7 +23,7 @@ class ReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-        length: 3,
+        length: 2,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('Reports'),
@@ -41,7 +42,6 @@ class ReportsScreen extends StatelessWidget {
           body: TabBarView(children: [
             _MonthlyUse(store: store),
             _ByDepartment(store: store),
-            _Reorder(store: store),
           ]),
         ),
       );
@@ -169,41 +169,67 @@ class _ByDepartmentState extends State<_ByDepartment> {
   }
 }
 
-class _Reorder extends StatelessWidget {
-  const _Reorder({required this.store});
+/// Items at or under their minimum, with how much to order to cover two months.
+class ReorderScreen extends StatelessWidget {
+  const ReorderScreen({super.key, required this.store});
   final WarehouseStore store;
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final monthly = store.monthlyIssued();
     final now = DateTime.now();
     final list = store.stockList.where((s) => s.status != StockStatus.inStock).toList()
       ..sort((a, b) => a.qty.compareTo(b.qty));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      Text('${list.length} items are at or below their minimum level.', style: const TextStyle(color: Colors.grey)),
-      DataTable(
-        columns: const [
-          DataColumn(label: Text('Code')),
-          DataColumn(label: Text('Item')),
-          DataColumn(label: Text('Unit')),
-          DataColumn(label: Text('In stock'), numeric: true),
-          DataColumn(label: Text('Minimum'), numeric: true),
-          DataColumn(label: Text('Avg use / month'), numeric: true),
-          DataColumn(label: Text('Status')),
-        ],
-        rows: [
-          for (final s in list)
-            DataRow(cells: [
-              DataCell(Text(s.item.id)),
-              DataCell(NameText(s.item.name)),
-              DataCell(NameText(s.item.unit)),
-              DataCell(Text(fmtQty(s.qty), style: const TextStyle(fontWeight: FontWeight.w600))),
-              DataCell(Text(fmtQty(s.item.minLevel))),
-              DataCell(Text(fmtQty(avgMonthlyUse(monthly[s.item.id], now).round()))),
-              DataCell(StatusChip(s.status)),
-            ]),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Reorder'),
+        bottom: SubNav.bar(context),
+        actions: [
+          IconButton(tooltip: 'Export to Excel', icon: const Icon(Icons.table_view_outlined), onPressed: () => exportExcel(store)),
+          const SizedBox(width: 8),
         ],
       ),
-    ]);
+      body: PageBody(children: [
+        Text(list.isEmpty ? 'Nothing to reorder. Every item is above its minimum.' : '${list.length} items are at or under their minimum level. '
+            'The suggestion covers about two months of use.',
+            style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        if (list.isNotEmpty)
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [
+              for (final (i, s) in list.indexed) ...[
+                if (i > 0) const Divider(height: 1),
+                _ReorderTile(store: store, s: s, avg: avgMonthlyUse(monthly[s.item.id], now)),
+              ],
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
+class _ReorderTile extends StatelessWidget {
+  const _ReorderTile({required this.store, required this.s, required this.avg});
+  final WarehouseStore store;
+  final StockInfo s;
+  final num avg;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final target = [s.item.minLevel * 2, avg * 2].reduce((a, b) => a > b ? a : b);
+    final suggest = (target - (s.qty < 0 ? 0 : s.qty)).ceil();
+    return ListTile(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ItemDetailScreen(store: store, itemId: s.item.id))),
+      title: NameText(s.item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text('${s.item.id} · in stock ${fmtQty(s.qty)} · min ${fmtQty(s.item.minLevel)} · uses ~${fmtQty(avg.round())}/month'),
+      trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        if (suggest > 0) Text('Order $suggest', style: t.textTheme.titleSmall!.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        StatusChip(s.status),
+      ]),
+    );
   }
 }
