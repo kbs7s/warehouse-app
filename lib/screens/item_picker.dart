@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../store.dart';
 import '../ui.dart';
@@ -36,8 +37,10 @@ class _ItemPickerState extends State<_ItemPicker> {
             child: TextField(
               autofocus: true,
               onChanged: (v) => setState(() => _q = v),
-              decoration: const InputDecoration(
-                  hintText: 'Type part of the item name', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  hintText: tx('Type part of the item name', 'اكتب جزءاً من اسم المادة'),
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder()),
             ),
           ),
           Expanded(
@@ -49,7 +52,7 @@ class _ItemPickerState extends State<_ItemPicker> {
                 return ListTile(
                   enabled: !added,
                   title: Align(alignment: AlignmentDirectional.centerStart, child: NameText(s.item.name, style: const TextStyle(fontSize: 17))),
-                  subtitle: Text(added ? '${s.item.id} · already on this list' : s.item.id),
+                  subtitle: Text(added ? tx('${s.item.id} · already on this list', '${s.item.id} · موجودة في القائمة') : s.item.id),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('${fmtQty(s.qty)} ', style: const TextStyle(fontWeight: FontWeight.w600)),
                     NameText(s.item.unit),
@@ -65,7 +68,7 @@ class _ItemPickerState extends State<_ItemPicker> {
             padding: const EdgeInsets.all(8),
             child: Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))),
+                child: TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Close', 'إغلاق')))),
           ),
         ]),
       ),

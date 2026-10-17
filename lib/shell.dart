@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'insights.dart';
+import 'l10n.dart';
 import 'screens/assistant_screen.dart';
 import 'screens/client_screens.dart';
 import 'screens/equipment_screen.dart';
@@ -57,10 +58,13 @@ class SubNav extends InheritedWidget {
 }
 
 class _Section {
-  const _Section(this.label, this.icon, this.selectedIcon, this.pages, {this.wideOnly = false});
-  final String label;
+  const _Section(this.key, this.ar, this.icon, this.selectedIcon, this.pages, {this.wideOnly = false});
+  /// Stable English name used by [Shell.go], whatever the interface language.
+  final String key;
+  final String ar;
   final IconData icon, selectedIcon;
-  final List<(String, Widget Function(WarehouseStore, Shell))> pages;
+  final List<(String, String, Widget Function(WarehouseStore, Shell))> pages;
+  String get label => tx(key, ar);
   final bool wideOnly;
 }
 
@@ -83,44 +87,44 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   final Map<int, int> _page = {};
 
   static final _sections = <_Section>[
-    _Section('Home', Icons.space_dashboard_outlined, Icons.space_dashboard, [
-      ('Home', (s, sh) => HomeScreen(store: s, shell: sh)),
+    _Section('Home', 'الرئيسية', Icons.space_dashboard_outlined, Icons.space_dashboard, [
+      ('Home', 'الرئيسية', (s, sh) => HomeScreen(store: s, shell: sh)),
     ]),
-    _Section('Issue', Icons.outbox_outlined, Icons.outbox, [
-      ('Issues', (s, _) => ReceiptsScreen(store: s)),
+    _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
+      ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
     ]),
-    _Section('Stock', Icons.inventory_2_outlined, Icons.inventory_2, [
-      ('Items', (s, _) => StockScreen(store: s)),
-      ('Reorder', (s, _) => ReorderScreen(store: s)),
-      ('Purchases', (s, _) => PurchasesScreen(store: s)),
-      ('Reports', (s, _) => ReportsScreen(store: s)),
+    _Section('Stock', 'المخزون', Icons.inventory_2_outlined, Icons.inventory_2, [
+      ('Items', 'المواد', (s, _) => StockScreen(store: s)),
+      ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
+      ('Purchases', 'المشتريات', (s, _) => PurchasesScreen(store: s)),
+      ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
     ]),
-    _Section('Money', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
-      ('Overview', (s, _) => ProfitScreen(store: s)),
-      ('Invoices', (s, _) => InvoicesScreen(store: s)),
-      ('Clients', (s, _) => ClientsScreen(store: s)),
-      ('Expenses', (s, _) => ExpensesScreen(store: s)),
-      ('Supplier bills', (s, _) => PaymentsScreen(store: s)),
+    _Section('Money', 'المالية', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
+      ('Overview', 'نظرة عامة', (s, _) => ProfitScreen(store: s)),
+      ('Invoices', 'الفواتير', (s, _) => InvoicesScreen(store: s)),
+      ('Clients', 'الزبائن', (s, _) => ClientsScreen(store: s)),
+      ('Expenses', 'المصاريف', (s, _) => ExpensesScreen(store: s)),
+      ('Supplier bills', 'فواتير المجهزين', (s, _) => PaymentsScreen(store: s)),
     ]),
-    _Section('Assistant', Icons.auto_awesome_outlined, Icons.auto_awesome, [
-      ('Assistant', (s, sh) => AssistantScreen(store: s, shell: sh)),
+    _Section('Assistant', 'المساعد', Icons.auto_awesome_outlined, Icons.auto_awesome, [
+      ('Assistant', 'المساعد', (s, sh) => AssistantScreen(store: s, shell: sh)),
     ]),
-    _Section('Equipment', Icons.medical_services_outlined, Icons.medical_services, [
-      ('Equipment', (s, _) => EquipmentScreen(store: s)),
+    _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [
+      ('Equipment', 'المعدات', (s, _) => EquipmentScreen(store: s)),
     ], wideOnly: true),
-    _Section('Settings', Icons.settings_outlined, Icons.settings, [
-      ('Settings', (s, _) => SettingsScreen(store: s)),
+    _Section('Settings', 'الإعدادات', Icons.settings_outlined, Icons.settings, [
+      ('Settings', 'الإعدادات', (s, _) => SettingsScreen(store: s)),
     ], wideOnly: true),
   ];
 
   @override
   void go(String section, [int page = 0]) {
-    final i = _sections.indexWhere((s) => s.label == section);
+    final i = _sections.indexWhere((s) => s.key == section);
     // Phones have no tab for wide-only sections (Equipment, Settings): open them as a page instead.
     if (_sections[i].wideOnly && MediaQuery.sizeOf(context).width < 700) {
       Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => ListenableBuilder(
-              listenable: widget.store, builder: (_, _) => _sections[i].pages[page].$2(widget.store, this))));
+              listenable: widget.store, builder: (_, _) => _sections[i].pages[page].$3(widget.store, this))));
       return;
     }
     setState(() {
@@ -147,14 +151,14 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     final sec = _sections[_section];
     final pageIdx = _page[_section] ?? 0;
     final body = SubNav(
-      labels: [for (final p in sec.pages) p.$1],
+      labels: [for (final p in sec.pages) tx(p.$1, p.$2)],
       index: pageIdx,
       onSelect: (i) => setState(() => _page[_section] = i),
       child: ListenableBuilder(
         listenable: widget.store,
         builder: (_, _) => KeyedSubtree(
           key: ValueKey('$_section/$pageIdx'),
-          child: sec.pages[pageIdx].$2(widget.store, this),
+          child: sec.pages[pageIdx].$3(widget.store, this),
         ),
       ),
     );
@@ -198,7 +202,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
                       _Logo(color: scheme.primary),
                       const SizedBox(width: 10),
                       Expanded(
-                          child: Text(widget.store.companyName.isEmpty ? 'My business' : widget.store.companyName,
+                          child: Text(widget.store.companyName.isEmpty ? tx('My business', 'قسم التجهيز') : widget.store.companyName,
                               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                               overflow: TextOverflow.ellipsis)),
                     ]),

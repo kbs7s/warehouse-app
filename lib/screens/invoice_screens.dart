@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../pdf.dart';
 import '../shell.dart';
@@ -25,10 +26,10 @@ class InvoiceStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      InvoiceStatus.paid => ('Paid', AppColors.good),
-      InvoiceStatus.partlyPaid => ('Part paid', AppColors.info),
-      InvoiceStatus.unpaid => ('Unpaid', AppColors.warn),
-      InvoiceStatus.overdue => ('Overdue', AppColors.bad),
+      InvoiceStatus.paid => (tx('Paid', 'مدفوعة'), AppColors.good),
+      InvoiceStatus.partlyPaid => (tx('Part paid', 'مدفوعة جزئياً'), AppColors.info),
+      InvoiceStatus.unpaid => (tx('Unpaid', 'غير مدفوعة'), AppColors.warn),
+      InvoiceStatus.overdue => (tx('Overdue', 'متأخرة'), AppColors.bad),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -37,6 +38,15 @@ class InvoiceStatusChip extends StatelessWidget {
     );
   }
 }
+
+/// Payment methods are stored in English; show them in the interface language.
+String payMethodLabel(String m) => switch (m) {
+      'Cash' => tx('Cash', 'نقداً'),
+      'Bank transfer' => tx('Bank transfer', 'تحويل مصرفي'),
+      'Card' => tx('Card', 'بطاقة'),
+      'Cheque' => tx('Cheque', 'صك'),
+      _ => m,
+    };
 
 enum _Filter { all, open, overdue, paid }
 
@@ -70,30 +80,31 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final overdue = s.overdue(today);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Invoices'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Invoices', 'الفواتير')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openInvoice(context, s, null),
         icon: const Icon(Icons.add),
-        label: const Text('New invoice'),
+        label: Text(tx('New invoice', 'فاتورة جديدة')),
       ),
       body: PageBody(children: [
         TileGrid(wideColumns: 3, children: [
-          MetricTile(label: 'Clients owe you', value: fmtMoneyShort(s.owedToUs), icon: Icons.hourglass_bottom,
-              hint: '${s.invoices.where((i) => i.balance > 0).length} invoices not fully paid'),
+          MetricTile(label: tx('Clients owe you', 'ديونك على الزبائن'), value: fmtMoneyShort(s.owedToUs), icon: Icons.hourglass_bottom,
+              hint: tx('${s.invoices.where((i) => i.balance > 0).length} invoices not fully paid',
+                  '${s.invoices.where((i) => i.balance > 0).length} فواتير غير مسددة بالكامل')),
           MetricTile(
-              label: 'Overdue',
+              label: tx('Overdue', 'متأخرة'),
               value: fmtMoneyShort(overdue.fold<num>(0, (t, i) => t + i.balance)),
               icon: Icons.error_outline,
               color: overdue.isEmpty ? null : AppColors.bad,
-              hint: '${overdue.length} past the due date'),
+              hint: tx('${overdue.length} past the due date', '${overdue.length} تجاوزت تاريخ الاستحقاق')),
           MetricTile(
-              label: 'Collected this month',
+              label: tx('Collected this month', 'المحصّل هذا الشهر'),
               value: fmtMoneyShort(s.profit(Period.thisMonth.range().$1, Period.thisMonth.range().$2).received),
               icon: Icons.payments_outlined,
               color: AppColors.good),
         ]),
         const SizedBox(height: 16),
-        SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Invoice number or client'),
+        SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Invoice number or client', 'رقم الفاتورة أو الزبون')),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final f in _Filter.values)
@@ -102,10 +113,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               selected: _filter == f,
               onSelected: (_) => setState(() => _filter = f),
               label: Text(switch (f) {
-                _Filter.all => 'All',
-                _Filter.open => 'Not paid',
-                _Filter.overdue => 'Overdue',
-                _Filter.paid => 'Paid',
+                _Filter.all => tx('All', 'الكل'),
+                _Filter.open => tx('Not paid', 'غير مسددة'),
+                _Filter.overdue => tx('Overdue', 'متأخرة'),
+                _Filter.paid => tx('Paid', 'مدفوعة'),
               }),
             ),
         ]),
@@ -113,11 +124,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         if (list.isEmpty)
           EmptyState(
             icon: Icons.receipt_long_outlined,
-            title: s.invoices.isEmpty ? 'No invoices yet' : 'No invoices match',
-            message: s.invoices.isEmpty ? 'Create an invoice when you sell to a client. Stock items come out of stock automatically.' : null,
+            title: s.invoices.isEmpty ? tx('No invoices yet', 'لا توجد فواتير بعد') : tx('No invoices match', 'لا توجد فاتورة مطابقة'),
+            message: s.invoices.isEmpty
+                ? tx('Create an invoice when you sell to a client. Stock items come out of stock automatically.',
+                    'أنشئ فاتورة عندما تبيع لزبون. المواد تُخصم من المخزون تلقائياً.')
+                : null,
             action: s.invoices.isEmpty
                 ? FilledButton.icon(
-                    onPressed: () => openInvoice(context, s, null), icon: const Icon(Icons.add), label: const Text('New invoice'))
+                    onPressed: () => openInvoice(context, s, null), icon: const Icon(Icons.add), label: Text(tx('New invoice', 'فاتورة جديدة')))
                 : null,
           )
         else
@@ -144,15 +158,15 @@ class InvoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final client = store.client(inv.clientId)?.name ?? 'No client';
+    final client = store.client(inv.clientId)?.name ?? tx('No client', 'بدون زبون');
     return ListTile(
       onTap: () => openInvoice(context, store, inv),
       leading: CircleAvatar(
         backgroundColor: t.colorScheme.primaryContainer,
         child: Text('${inv.no}', style: TextStyle(fontSize: 13, color: t.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
       ),
-      title: showClient ? NameText(client, style: const TextStyle(fontWeight: FontWeight.w600)) : Text('Invoice #${inv.no}'),
-      subtitle: Text(inv.dueDate == null || inv.balance <= 0 ? fmtDate(inv.date) : '${fmtDate(inv.date)} · due ${fmtDate(inv.dueDate)}'),
+      title: showClient ? NameText(client, style: const TextStyle(fontWeight: FontWeight.w600)) : Text(tx('Invoice #${inv.no}', 'فاتورة رقم ${inv.no}')),
+      subtitle: Text(inv.dueDate == null || inv.balance <= 0 ? fmtDate(inv.date) : '${fmtDate(inv.date)} · ${tx('due', 'تستحق')} ${fmtDate(inv.dueDate)}'),
       trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text(fmtMoney(inv.total), style: const TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
@@ -172,7 +186,7 @@ class InvoiceDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inv = store.invoices.where((i) => i.no == no).firstOrNull;
-    if (inv == null) return const Scaffold(body: Center(child: Text('This invoice was deleted.')));
+    if (inv == null) return Scaffold(body: Center(child: Text(tx('This invoice was deleted.', 'تم حذف هذه الفاتورة.'))));
     final t = Theme.of(context);
     final client = store.client(inv.clientId);
     final cost = [for (final (i, _) in inv.lines.indexed) store.invoiceLineCost(inv.no, i)].fold<num>(0, (a, b) => a + b);
@@ -181,19 +195,20 @@ class InvoiceDetail extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Invoice #${inv.no}'),
+        title: Text(tx('Invoice #${inv.no}', 'فاتورة رقم ${inv.no}')),
         actions: [
-          IconButton(tooltip: 'Print or share PDF', icon: const Icon(Icons.ios_share), onPressed: () => shareInvoicePdf(store, inv)),
+          IconButton(tooltip: tx('Print or share PDF', 'طباعة أو مشاركة PDF'), icon: const Icon(Icons.ios_share), onPressed: () => shareInvoicePdf(store, inv)),
           IconButton(
-              tooltip: 'Edit',
+              tooltip: tx('Edit', 'تعديل'),
               icon: const Icon(Icons.edit_outlined),
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                   fullscreenDialog: true, builder: (_) => InvoiceEditor(store: store, existing: inv)))),
           IconButton(
-            tooltip: 'Delete',
+            tooltip: tx('Delete', 'حذف'),
             icon: const Icon(Icons.delete_outline),
             onPressed: () async {
-              if (await confirm(context, 'Delete invoice #${inv.no}?', 'Its items go back into stock and its payments are removed.')) {
+              if (await confirm(context, tx('Delete invoice #${inv.no}?', 'حذف الفاتورة رقم ${inv.no}؟'),
+                  tx('Its items go back into stock and its payments are removed.', 'ترجع موادها إلى المخزون وتُحذف دفعاتها.'))) {
                 store.deleteInvoice(inv.no);
                 if (context.mounted) Navigator.pop(context);
               }
@@ -206,7 +221,7 @@ class InvoiceDetail extends StatelessWidget {
           ? FloatingActionButton.extended(
               onPressed: () => recordPayment(context, store, inv),
               icon: const Icon(Icons.payments_outlined),
-              label: const Text('Record payment'))
+              label: Text(tx('Record payment', 'تسجيل دفعة')))
           : null,
       body: PageBody(maxWidth: 860, children: [
         Card(
@@ -215,24 +230,25 @@ class InvoiceDetail extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(
-                    child: NameText(client?.name ?? 'No client',
+                    child: NameText(client?.name ?? tx('No client', 'بدون زبون'),
                         style: t.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.w800))),
                 InvoiceStatusChip(inv.status(todayIso())),
               ]),
               const SizedBox(height: 4),
-              Text('Issued ${fmtDate(inv.date)}${inv.dueDate == null ? '' : ' · due ${fmtDate(inv.dueDate)}'}',
+              Text(
+                  '${tx('Issued', 'صدرت')} ${fmtDate(inv.date)}${inv.dueDate == null ? '' : ' · ${tx('due', 'تستحق')} ${fmtDate(inv.dueDate)}'}',
                   style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
               if (client?.phone != null) Text(client!.phone!, style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 18),
               TileGrid(wideColumns: 3, children: [
-                _Mini('Total', fmtMoney(inv.total)),
-                _Mini('Paid', fmtMoney(inv.paid), color: AppColors.good),
-                _Mini('Still owed', fmtMoney(inv.balance), color: inv.balance > 0 ? AppColors.warn : null),
+                _Mini(tx('Total', 'المجموع'), fmtMoney(inv.total)),
+                _Mini(tx('Paid', 'المدفوع'), fmtMoney(inv.paid), color: AppColors.good),
+                _Mini(tx('Still owed', 'المتبقي'), fmtMoney(inv.balance), color: inv.balance > 0 ? AppColors.warn : null),
               ]),
             ]),
           ),
         ),
-        const SectionTitle('Items'),
+        SectionTitle(tx('Items', 'المواد')),
         Card(
           clipBehavior: Clip.antiAlias,
           child: Column(children: [
@@ -241,13 +257,13 @@ class InvoiceDetail extends StatelessWidget {
               ListTile(
                 title: NameText(_lineName(store, l), style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text('${fmtQty(l.qty)} × ${fmtMoney(l.unitPrice)}'
-                    '${l.itemId == null ? ' · service' : ' · cost ${fmtMoney(store.invoiceLineCost(inv.no, i))}'}'),
+                    '${l.itemId == null ? ' · ${tx('service', 'خدمة')}' : ' · ${tx('cost', 'الكلفة')} ${fmtMoney(store.invoiceLineCost(inv.no, i))}'}'),
                 trailing: Text(fmtMoney(l.total), style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ],
             if (inv.discount != 0) ...[
               const Divider(height: 1),
-              ListTile(title: const Text('Discount'), trailing: Text('−${fmtMoney(inv.discount)}')),
+              ListTile(title: Text(tx('Discount', 'خصم')), trailing: Text('−${fmtMoney(inv.discount)}')),
             ],
           ]),
         ),
@@ -256,13 +272,14 @@ class InvoiceDetail extends StatelessWidget {
           color: (profit >= 0 ? AppColors.good : AppColors.bad).withValues(alpha: .08),
           child: ListTile(
             leading: Icon(Icons.savings_outlined, color: profit >= 0 ? AppColors.good : AppColors.bad),
-            title: Text('You make ${fmtMoney(profit)} on this invoice'),
-            subtitle: Text('Sold for ${fmtMoney(inv.total)}; the stock on it cost you ${fmtMoney(cost)} (oldest stock first).'),
+            title: Text(tx('You make ${fmtMoney(profit)} on this invoice', 'ربحك ${fmtMoney(profit)} من هذه الفاتورة')),
+            subtitle: Text(tx('Sold for ${fmtMoney(inv.total)}; the stock on it cost you ${fmtMoney(cost)} (oldest stock first).',
+                'بعتها بـ ${fmtMoney(inv.total)}؛ وكلّفتك المواد فيها ${fmtMoney(cost)} (الأقدم أولاً).')),
           ),
         ),
-        SectionTitle('Payments', trailing: Text('${inv.payments.length}')),
+        SectionTitle(tx('Payments', 'الدفعات'), trailing: Text('${inv.payments.length}')),
         if (inv.payments.isEmpty)
-          const Card(child: ListTile(title: Text('No payments yet.')))
+          Card(child: ListTile(title: Text(tx('No payments yet.', 'لا توجد دفعات بعد.'))))
         else
           Card(
             clipBehavior: Clip.antiAlias,
@@ -272,12 +289,14 @@ class InvoiceDetail extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.check_circle, color: AppColors.good),
                   title: Text(fmtMoney(p.amount), style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text([fmtDate(p.date), ?p.method, ?p.note].join(' · ')),
+                  subtitle: Text([fmtDate(p.date), if (p.method != null) payMethodLabel(p.method!), ?p.note].join(' · ')),
                   trailing: IconButton(
-                    tooltip: 'Remove payment',
+                    tooltip: tx('Remove payment', 'حذف الدفعة'),
                     icon: const Icon(Icons.close),
                     onPressed: () async {
-                      if (await confirm(context, 'Remove this payment?', '${fmtMoney(p.amount)} on ${fmtDate(p.date)}.', action: 'Remove')) {
+                      if (await confirm(context, tx('Remove this payment?', 'حذف هذه الدفعة؟'),
+                          tx('${fmtMoney(p.amount)} on ${fmtDate(p.date)}.', '${fmtMoney(p.amount)} بتاريخ ${fmtDate(p.date)}.'),
+                          action: tx('Remove', 'حذف'))) {
                         inv.payments.removeAt(i);
                         store.saveInvoice(inv);
                       }
@@ -288,7 +307,7 @@ class InvoiceDetail extends StatelessWidget {
             ]),
           ),
         if (inv.note != null) ...[
-          const SectionTitle('Note'),
+          SectionTitle(tx('Note', 'ملاحظة')),
           Card(child: Padding(padding: const EdgeInsets.all(16), child: NameText(inv.note!, maxLines: null))),
         ],
       ]),
@@ -297,7 +316,7 @@ class InvoiceDetail extends StatelessWidget {
 }
 
 String _lineName(WarehouseStore store, InvoiceLine l) =>
-    l.itemId == null ? (l.description ?? 'Service') : (store.item(l.itemId!)?.name ?? l.itemId!);
+    l.itemId == null ? (l.description ?? tx('Service', 'خدمة')) : (store.item(l.itemId!)?.name ?? l.itemId!);
 
 class _Mini extends StatelessWidget {
   const _Mini(this.label, this.value, {this.color});
@@ -344,41 +363,41 @@ class _PaymentDialogState extends State<_PaymentDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text('Payment for invoice #${widget.inv.no}'),
+        title: Text(tx('Payment for invoice #${widget.inv.no}', 'دفعة للفاتورة رقم ${widget.inv.no}')),
         content: SizedBox(
           width: 420,
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Still owed: ${fmtMoney(widget.inv.balance)}'),
+            Text(tx('Still owed: ${fmtMoney(widget.inv.balance)}', 'المتبقي: ${fmtMoney(widget.inv.balance)}')),
             const SizedBox(height: 14),
             TextField(
               controller: _amount,
               autofocus: true,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount received (IQD)'),
+              decoration: InputDecoration(labelText: tx('Amount received (IQD)', 'المبلغ المستلم (د.ع)')),
             ),
             const SizedBox(height: 12),
-            DatePickField(label: 'Date', value: _date, onChanged: (d) => setState(() => _date = d ?? todayIso())),
+            DatePickField(label: tx('Date', 'التاريخ'), value: _date, onChanged: (d) => setState(() => _date = d ?? todayIso())),
             const SizedBox(height: 12),
             Wrap(spacing: 8, children: [
               for (final m in ['Cash', 'Bank transfer', 'Card', 'Cheque'])
-                ChoiceChip(label: Text(m), selected: _method == m, showCheckmark: false, onSelected: (_) => setState(() => _method = m)),
+                ChoiceChip(label: Text(payMethodLabel(m)), selected: _method == m, showCheckmark: false, onSelected: (_) => setState(() => _method = m)),
             ]),
             const SizedBox(height: 12),
-            TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note (optional)')),
+            TextField(controller: _note, decoration: InputDecoration(labelText: tx('Note (optional)', 'ملاحظة (اختياري)'))),
           ]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
           FilledButton(
             onPressed: () {
               final a = parseNum(_amount.text);
-              if (a == null || a <= 0) return toast(context, 'Enter the amount received.');
+              if (a == null || a <= 0) return toast(context, tx('Enter the amount received.', 'أدخل المبلغ المستلم.'));
               final note = _note.text.trim();
               widget.store.addInvoicePayment(
                   widget.inv.no, InvoicePayment(date: _date, amount: a, method: _method, note: note.isEmpty ? null : note));
               Navigator.pop(context);
             },
-            child: const Text('Save payment'),
+            child: Text(tx('Save payment', 'حفظ الدفعة')),
           ),
         ],
       );
@@ -410,7 +429,7 @@ class DatePickField extends StatelessWidget {
                 ? IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(null))
                 : const Icon(Icons.calendar_today_outlined, size: 18),
           ),
-          child: Text(value == null ? 'None' : fmtDate(value)),
+          child: Text(value == null ? tx('None', 'لا يوجد') : fmtDate(value)),
         ),
       );
 }
@@ -494,17 +513,17 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
 
   void _save() {
     final no = int.tryParse(_no.text.trim());
-    if (no == null) return toast(context, 'Enter an invoice number.');
-    if (no != ex?.no && store.invoices.any((i) => i.no == no)) return toast(context, 'Invoice number $no already exists.');
-    if (_clientId == null) return toast(context, 'Choose the client.');
+    if (no == null) return toast(context, tx('Enter an invoice number.', 'أدخل رقم الفاتورة.'));
+    if (no != ex?.no && store.invoices.any((i) => i.no == no)) return toast(context, tx('Invoice number $no already exists.', 'رقم الفاتورة $no موجود مسبقاً.'));
+    if (_clientId == null) return toast(context, tx('Choose the client.', 'اختر الزبون.'));
     final lines = <InvoiceLine>[];
     for (final l in _lines) {
-      if (l.q <= 0) return toast(context, 'Enter a quantity on every line.');
+      if (l.q <= 0) return toast(context, tx('Enter a quantity on every line.', 'أدخل الكمية في كل سطر.'));
       final d = l.description.text.trim();
-      if (l.itemId == null && d.isEmpty) return toast(context, 'Describe each service line.');
+      if (l.itemId == null && d.isEmpty) return toast(context, tx('Describe each service line.', 'اكتب وصفاً لكل سطر خدمة.'));
       lines.add(InvoiceLine(itemId: l.itemId, description: d.isEmpty ? null : d, qty: l.q, unitPrice: l.p));
     }
-    if (lines.isEmpty) return toast(context, 'Add at least one line.');
+    if (lines.isEmpty) return toast(context, tx('Add at least one line.', 'أضف سطراً واحداً على الأقل.'));
     final note = _note.text.trim();
     store.saveInvoice(
       Invoice(
@@ -531,9 +550,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(ex == null ? 'New invoice' : 'Edit invoice #${ex!.no}'),
+        title: Text(ex == null ? tx('New invoice', 'فاتورة جديدة') : tx('Edit invoice #${ex!.no}', 'تعديل الفاتورة رقم ${ex!.no}')),
         actions: [
-          Padding(padding: const EdgeInsets.only(right: 12), child: FilledButton(onPressed: _save, child: const Text('Save'))),
+          Padding(padding: const EdgeInsets.only(right: 12), child: FilledButton(onPressed: _save, child: Text(tx('Save', 'حفظ')))),
         ],
       ),
       body: PageBody(maxWidth: 860, bottomPad: 40, children: [
@@ -543,32 +562,36 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             onTap: _pickClient,
             leading: const CircleAvatar(child: Icon(Icons.person_outline)),
             title: client == null
-                ? const Text('Choose client', style: TextStyle(fontWeight: FontWeight.w600))
+                ? Text(tx('Choose client', 'اختر الزبون'), style: const TextStyle(fontWeight: FontWeight.w600))
                 : NameText(client.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(client == null ? 'Who are you billing?' : 'Owes ${fmtMoney(store.owedBy(client.id))} on other invoices'),
+            subtitle: Text(client == null
+                ? tx('Who are you billing?', 'لمن هذه الفاتورة؟')
+                : tx('Owes ${fmtMoney(store.owedBy(client.id))} on other invoices', 'عليه ${fmtMoney(store.owedBy(client.id))} في فواتير أخرى')),
             trailing: const Icon(Icons.chevron_right),
           ),
         ),
         const SizedBox(height: 14),
         _Responsive(phone: phone, children: [
-          TextField(controller: _no, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Invoice #')),
-          DatePickField(label: 'Date', value: _date, onChanged: (d) => setState(() => _date = d ?? _date)),
-          DatePickField(label: 'Pay by', value: _due, clearable: true, onChanged: (d) => setState(() => _due = d)),
+          TextField(controller: _no, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: tx('Invoice #', 'رقم الفاتورة'))),
+          DatePickField(label: tx('Date', 'التاريخ'), value: _date, onChanged: (d) => setState(() => _date = d ?? _date)),
+          DatePickField(label: tx('Pay by', 'تاريخ الاستحقاق'), value: _due, clearable: true, onChanged: (d) => setState(() => _due = d)),
         ]),
-        SectionTitle('Lines', trailing: Text(fmtMoney(_subtotal), style: t.textTheme.titleSmall)),
+        SectionTitle(tx('Lines', 'الأسطر'), trailing: Text(fmtMoney(_subtotal), style: t.textTheme.titleSmall)),
         if (_lines.isEmpty)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Text('Add stock items you are selling, or a service line for work or anything not in stock.',
+              child: Text(
+                  tx('Add stock items you are selling, or a service line for work or anything not in stock.',
+                      'أضف المواد التي تبيعها، أو سطر خدمة لعمل أو لأي شيء غير موجود في المخزون.'),
                   style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
             ),
           ),
         for (final (i, l) in _lines.indexed) _lineCard(i, l, phone),
         const SizedBox(height: 10),
         Wrap(spacing: 10, runSpacing: 10, children: [
-          FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.inventory_2_outlined), label: const Text('Add stock item')),
-          OutlinedButton.icon(onPressed: _addService, icon: const Icon(Icons.handyman_outlined), label: const Text('Add service')),
+          FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.inventory_2_outlined), label: Text(tx('Add stock item', 'إضافة مادة من المخزون'))),
+          OutlinedButton.icon(onPressed: _addService, icon: const Icon(Icons.handyman_outlined), label: Text(tx('Add service', 'إضافة خدمة'))),
         ]),
         const SizedBox(height: 18),
         _Responsive(phone: phone, children: [
@@ -576,23 +599,25 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             controller: _discount,
             onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Discount (IQD)'),
+            decoration: InputDecoration(labelText: tx('Discount (IQD)', 'خصم (د.ع)')),
           ),
-          TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note (optional)')),
+          TextField(controller: _note, decoration: InputDecoration(labelText: tx('Note (optional)', 'ملاحظة (اختياري)'))),
         ]),
         const SizedBox(height: 18),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(children: [
-              _sumRow('Total to bill', fmtMoney(_total), bold: true),
+              _sumRow(tx('Total to bill', 'المبلغ المطلوب'), fmtMoney(_total), bold: true),
               const SizedBox(height: 6),
-              _sumRow('Stock cost (oldest first)', fmtMoney(cost)),
+              _sumRow(tx('Stock cost (oldest first)', 'كلفة المواد (الأقدم أولاً)'), fmtMoney(cost)),
               const Divider(height: 22),
-              _sumRow('You make', fmtMoney(profit),
+              _sumRow(tx('You make', 'ربحك'), fmtMoney(profit),
                   bold: true,
                   color: profit >= 0 ? AppColors.good : AppColors.bad,
-                  hint: _total > 0 ? '${(profit / _total * 100).toStringAsFixed(0)}% of the invoice' : null),
+                  hint: _total > 0
+                      ? tx('${(profit / _total * 100).toStringAsFixed(0)}% of the invoice', '${(profit / _total * 100).toStringAsFixed(0)}% من الفاتورة')
+                      : null),
             ]),
           ),
         ),
@@ -617,23 +642,24 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     final inStock = l.itemId == null ? null : store.stock(l.itemId!).qty + (ex?.lines.where((x) => x.itemId == l.itemId).fold<num>(0, (s, x) => s + x.qty) ?? 0);
     final unitCost = l.q > 0 ? cost / l.q : store.ledger.latestUnitCost(l.itemId ?? '');
     final info = l.itemId == null
-        ? 'Service'
-        : '${fmtQty(inStock!)} ${item?.unit ?? ''} in stock · costs you ${unitCost == null ? '?' : fmtMoney(unitCost)} each';
+        ? tx('Service', 'خدمة')
+        : tx('${fmtQty(inStock!)} ${item?.unit ?? ''} in stock · costs you ${unitCost == null ? '?' : fmtMoney(unitCost)} each',
+            '${fmtQty(inStock)} ${item?.unit ?? ''} في المخزون · كلفة الواحدة ${unitCost == null ? '?' : fmtMoney(unitCost)}');
     final qty = TextField(
       controller: l.qty,
       onChanged: (_) => setState(() {}),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(labelText: 'Qty'),
+      decoration: InputDecoration(labelText: tx('Qty', 'الكمية')),
     );
     final price = TextField(
       controller: l.price,
       onChanged: (_) => setState(() {}),
       keyboardType: TextInputType.number,
-      decoration: const InputDecoration(labelText: 'Price each (IQD)'),
+      decoration: InputDecoration(labelText: tx('Price each (IQD)', 'سعر الواحدة (د.ع)')),
     );
-    final remove = IconButton(tooltip: 'Remove line', icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i)));
+    final remove = IconButton(tooltip: tx('Remove line', 'حذف السطر'), icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i)));
     final name = l.itemId == null
-        ? TextField(controller: l.description, decoration: const InputDecoration(labelText: 'What was the service?'))
+        ? TextField(controller: l.description, decoration: InputDecoration(labelText: tx('What was the service?', 'ما هي الخدمة؟')))
         : NameText(item?.name ?? l.itemId!, style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600));
     final lowMargin = l.itemId != null && l.p > 0 && unitCost != null && l.p < unitCost;
 
@@ -663,7 +689,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             if (lowMargin)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('This price is below what the item cost you.', style: t.textTheme.bodySmall!.copyWith(color: AppColors.bad)),
+                child: Text(tx('This price is below what the item cost you.', 'هذا السعر أقل من كلفة المادة عليك.'), style: t.textTheme.bodySmall!.copyWith(color: AppColors.bad)),
               ),
           ]),
         ),

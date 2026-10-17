@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../export.dart';
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -9,7 +10,7 @@ import 'item_screens.dart';
 
 PreferredSizeWidget _bottom(BuildContext context) {
   final nav = SubNav.bar(context);
-  const tabs = TabBar(tabs: [Tab(text: 'Monthly use'), Tab(text: 'By department')]);
+  final tabs = TabBar(tabs: [Tab(text: tx('Monthly use', 'الاستهلاك الشهري')), Tab(text: tx('By department', 'حسب القسم'))]);
   if (nav == null) return tabs;
   return PreferredSize(
     preferredSize: Size.fromHeight(nav.preferredSize.height + tabs.preferredSize.height),
@@ -26,14 +27,14 @@ class ReportsScreen extends StatelessWidget {
         length: 2,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Reports'),
+            title: Text(tx('Reports', 'التقارير')),
             actions: [
               Padding(
-                padding: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsetsDirectional.only(end: 12),
                 child: FilledButton.icon(
                   onPressed: () => exportExcel(store),
                   icon: const Icon(Icons.table_view),
-                  label: const Text('Export to Excel'),
+                  label: Text(tx('Export to Excel', 'تصدير إلى إكسل')),
                 ),
               ),
             ],
@@ -65,7 +66,7 @@ class _Grid extends StatelessWidget {
               dataRowMaxHeight: 44,
               columnSpacing: 20,
               columns: [
-                const DataColumn(label: Text('Item')),
+                DataColumn(label: Text(tx('Item', 'المادة'))),
                 for (final c in columns) DataColumn(label: NameText(c), numeric: true),
               ],
               rows: [
@@ -108,14 +109,16 @@ class _MonthlyUseState extends State<_MonthlyUse> {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Row(children: [
-          Expanded(child: SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Filter items')),
+          Expanded(child: SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Filter items', 'ابحث في المواد'))),
           const SizedBox(width: 16),
-          const Flexible(
-              child: Text('Quantity issued per month. Months before the app use the Excel Year sheet.',
-                  style: TextStyle(color: Colors.grey))),
+          Flexible(
+              child: Text(
+                  tx('Quantity issued per month. Months before the app use the Excel Year sheet.',
+                      'الكمية المصروفة في كل شهر. الأشهر قبل التطبيق مأخوذة من ورقة السنة في إكسل.'),
+                  style: const TextStyle(color: Colors.grey))),
         ]),
       ),
-      Expanded(child: _Grid(columns: [...months.map(monthLabel), 'Total'], rows: rows)),
+      Expanded(child: _Grid(columns: [...months.map(monthLabel), tx('Total', 'المجموع')], rows: rows)),
     ]);
   }
 }
@@ -157,13 +160,14 @@ class _ByDepartmentState extends State<_ByDepartment> {
             },
           ),
           const SizedBox(width: 16),
-          Text('${rows.length} items issued to ${depts.length} departments', style: const TextStyle(color: Colors.grey)),
+          Text(tx('${rows.length} items issued to ${depts.length} departments', '${rows.length} مادة صُرفت إلى ${depts.length} قسم'),
+              style: const TextStyle(color: Colors.grey)),
         ]),
       ),
       Expanded(
         child: rows.isEmpty
-            ? const Center(child: Text('No receipts in these dates.'))
-            : _Grid(columns: [...depts, 'Total'], rows: rows),
+            ? Center(child: Text(tx('No receipts in these dates.', 'لا يوجد صرف في هذه التواريخ.')))
+            : _Grid(columns: [...depts, tx('Total', 'المجموع')], rows: rows),
       ),
     ]);
   }
@@ -183,16 +187,19 @@ class ReorderScreen extends StatelessWidget {
       ..sort((a, b) => a.qty.compareTo(b.qty));
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reorder'),
+        title: Text(tx('Reorder', 'إعادة الطلب')),
         bottom: SubNav.bar(context),
         actions: [
-          IconButton(tooltip: 'Export to Excel', icon: const Icon(Icons.table_view_outlined), onPressed: () => exportExcel(store)),
+          IconButton(tooltip: tx('Export to Excel', 'تصدير إلى إكسل'), icon: const Icon(Icons.table_view_outlined), onPressed: () => exportExcel(store)),
           const SizedBox(width: 8),
         ],
       ),
       body: PageBody(children: [
-        Text(list.isEmpty ? 'Nothing to reorder. Every item is above its minimum.' : '${list.length} items are at or under their minimum level. '
-            'The suggestion covers about two months of use.',
+        Text(
+            list.isEmpty
+                ? tx('Nothing to reorder. Every item is above its minimum.', 'لا شيء يحتاج إعادة طلب. كل المواد فوق الحد الأدنى.')
+                : tx('${list.length} items are at or under their minimum level. The suggestion covers about two months of use.',
+                    '${list.length} مادة عند الحد الأدنى أو أقل. الكمية المقترحة تكفي لشهرين تقريباً.'),
             style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 12),
         if (list.isNotEmpty)
@@ -224,9 +231,10 @@ class _ReorderTile extends StatelessWidget {
     return ListTile(
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ItemDetailScreen(store: store, itemId: s.item.id))),
       title: NameText(s.item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('${s.item.id} · in stock ${fmtQty(s.qty)} · min ${fmtQty(s.item.minLevel)} · uses ~${fmtQty(avg.round())}/month'),
+      subtitle: Text(tx('${s.item.id} · in stock ${fmtQty(s.qty)} · min ${fmtQty(s.item.minLevel)} · uses ~${fmtQty(avg.round())}/month',
+          '${s.item.id} · الموجود ${fmtQty(s.qty)} · الحد الأدنى ${fmtQty(s.item.minLevel)} · الاستهلاك ~${fmtQty(avg.round())}/شهر')),
       trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-        if (suggest > 0) Text('Order $suggest', style: t.textTheme.titleSmall!.copyWith(fontWeight: FontWeight.w800)),
+        if (suggest > 0) Text(tx('Order $suggest', 'اطلب $suggest'), style: t.textTheme.titleSmall!.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         StatusChip(s.status),
       ]),

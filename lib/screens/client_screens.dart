@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -31,20 +32,23 @@ class _ClientsScreenState extends State<ClientsScreen> {
       });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Clients'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Clients', 'الزبائن')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => editClient(context, s, null),
         icon: const Icon(Icons.person_add_alt),
-        label: const Text('New client'),
+        label: Text(tx('New client', 'زبون جديد')),
       ),
       body: PageBody(children: [
-        SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Name or phone'),
+        SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Name or phone', 'الاسم أو الهاتف')),
         const SizedBox(height: 12),
         if (list.isEmpty)
           EmptyState(
             icon: Icons.people_outline,
-            title: s.clients.isEmpty ? 'No clients yet' : 'No clients match',
-            message: s.clients.isEmpty ? 'Add the people or companies you sell to. Each one gets a running balance.' : null,
+            title: s.clients.isEmpty ? tx('No clients yet', 'لا يوجد زبائن بعد') : tx('No clients match', 'لا يوجد زبون مطابق'),
+            message: s.clients.isEmpty
+                ? tx('Add the people or companies you sell to. Each one gets a running balance.',
+                    'أضف الأشخاص أو الشركات التي تبيع لها. لكل واحد رصيد يتحدّث تلقائياً.')
+                : null,
           )
         else
           Card(
@@ -79,12 +83,12 @@ class _ClientTile extends StatelessWidget {
             style: TextStyle(color: t.colorScheme.onSecondaryContainer, fontWeight: FontWeight.w700)),
       ),
       title: NameText(c.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('${store.invoicesOf(c.id).length} invoices${c.phone == null ? '' : ' · ${c.phone}'}'),
+      subtitle: Text('${tx('${store.invoicesOf(c.id).length} invoices', '${store.invoicesOf(c.id).length} فواتير')}${c.phone == null ? '' : ' · ${c.phone}'}'),
       trailing: owed <= 0
-          ? Text('Settled', style: TextStyle(color: t.colorScheme.onSurfaceVariant))
+          ? Text(tx('Settled', 'لا يوجد دين'), style: TextStyle(color: t.colorScheme.onSurfaceVariant))
           : Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(fmtMoney(owed), style: TextStyle(fontWeight: FontWeight.w700, color: late ? AppColors.bad : AppColors.warn)),
-              Text(late ? 'overdue' : 'owes you', style: t.textTheme.bodySmall),
+              Text(late ? tx('overdue', 'متأخر') : tx('owes you', 'دين لك'), style: t.textTheme.bodySmall),
             ]),
     );
   }
@@ -101,7 +105,7 @@ class ClientDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = store.client(id);
-    if (c == null) return const Scaffold(body: Center(child: Text('This client was deleted.')));
+    if (c == null) return Scaffold(body: Center(child: Text(tx('This client was deleted.', 'تم حذف هذا الزبون.'))));
     final t = Theme.of(context);
     final invs = store.invoicesOf(id).reversed.toList();
     final billed = invs.fold<num>(0, (s, i) => s + i.total);
@@ -112,13 +116,13 @@ class ClientDetail extends StatelessWidget {
       appBar: AppBar(
         title: NameText(c.name),
         actions: [
-          IconButton(tooltip: 'Edit', icon: const Icon(Icons.edit_outlined), onPressed: () => editClient(context, store, c)),
+          IconButton(tooltip: tx('Edit', 'تعديل'), icon: const Icon(Icons.edit_outlined), onPressed: () => editClient(context, store, c)),
           IconButton(
-            tooltip: 'Delete',
+            tooltip: tx('Delete', 'حذف'),
             icon: const Icon(Icons.delete_outline),
             onPressed: () async {
-              if (invs.isNotEmpty) return toast(context, 'This client has invoices, so it cannot be deleted.');
-              if (await confirm(context, 'Delete ${c.name}?', 'This client has no invoices.')) {
+              if (invs.isNotEmpty) return toast(context, tx('This client has invoices, so it cannot be deleted.', 'لهذا الزبون فواتير، لذلك لا يمكن حذفه.'));
+              if (await confirm(context, tx('Delete ${c.name}?', 'حذف ${c.name}؟'), tx('This client has no invoices.', 'ليس لهذا الزبون فواتير.'))) {
                 store.deleteClient(id);
                 if (context.mounted) Navigator.pop(context);
               }
@@ -130,7 +134,7 @@ class ClientDetail extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openInvoice(context, store, null, clientId: id),
         icon: const Icon(Icons.add),
-        label: const Text('New invoice'),
+        label: Text(tx('New invoice', 'فاتورة جديدة')),
       ),
       body: PageBody(maxWidth: 860, children: [
         if (contact.isNotEmpty || c.note != null)
@@ -145,17 +149,17 @@ class ClientDetail extends StatelessWidget {
           ),
         const SizedBox(height: 12),
         TileGrid(wideColumns: 3, children: [
-          MetricTile(label: 'Billed in total', value: fmtMoneyShort(billed), icon: Icons.receipt_long_outlined),
-          MetricTile(label: 'Paid', value: fmtMoneyShort(paid), icon: Icons.check_circle_outline, color: AppColors.good),
+          MetricTile(label: tx('Billed in total', 'مجموع الفواتير'), value: fmtMoneyShort(billed), icon: Icons.receipt_long_outlined),
+          MetricTile(label: tx('Paid', 'المدفوع'), value: fmtMoneyShort(paid), icon: Icons.check_circle_outline, color: AppColors.good),
           MetricTile(
-              label: 'Owes you',
+              label: tx('Owes you', 'دين لك'),
               value: fmtMoneyShort(store.owedBy(id)),
               icon: Icons.hourglass_bottom,
               color: store.owedBy(id) > 0 ? AppColors.warn : null),
         ]),
-        SectionTitle('Invoices', trailing: Text('${invs.length}')),
+        SectionTitle(tx('Invoices', 'الفواتير'), trailing: Text('${invs.length}')),
         if (invs.isEmpty)
-          const Card(child: ListTile(title: Text('No invoices for this client yet.')))
+          Card(child: ListTile(title: Text(tx('No invoices for this client yet.', 'لا توجد فواتير لهذا الزبون بعد.'))))
         else
           Card(
             clipBehavior: Clip.antiAlias,
@@ -200,12 +204,12 @@ class _ClientPickerState extends State<_ClientPicker> {
             child: TextField(
               autofocus: true,
               onChanged: (v) => setState(() => _q = v),
-              decoration: const InputDecoration(hintText: 'Find a client', prefixIcon: Icon(Icons.search)),
+              decoration: InputDecoration(hintText: tx('Find a client', 'ابحث عن زبون'), prefixIcon: const Icon(Icons.search)),
             ),
           ),
           ListTile(
             leading: const CircleAvatar(child: Icon(Icons.person_add_alt)),
-            title: Text(_q.trim().isEmpty ? 'New client' : 'New client "${_q.trim()}"',
+            title: Text(_q.trim().isEmpty ? tx('New client', 'زبون جديد') : tx('New client "${_q.trim()}"', 'زبون جديد "${_q.trim()}"'),
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             onTap: () async {
               final id = await editClient(context, widget.store, null, name: _q.trim());
@@ -252,7 +256,7 @@ class _ClientFormState extends State<_ClientForm> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.c == null ? 'New client' : 'Edit client'),
+        title: Text(widget.c == null ? tx('New client', 'زبون جديد') : tx('Edit client', 'تعديل الزبون')),
         content: SizedBox(
           width: 480,
           child: SingleChildScrollView(
@@ -263,25 +267,25 @@ class _ClientFormState extends State<_ClientForm> {
                   controller: _name,
                   autofocus: widget.c == null,
                   textDirection: dirOf(_name.text),
-                  decoration: const InputDecoration(labelText: 'Name (person or company)'),
+                  decoration: InputDecoration(labelText: tx('Name (person or company)', 'الاسم (شخص أو شركة)')),
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
+              TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: tx('Phone', 'الهاتف'))),
               const SizedBox(height: 12),
-              TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
+              TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: tx('Email', 'البريد الإلكتروني'))),
               const SizedBox(height: 12),
-              TextField(controller: _address, decoration: const InputDecoration(labelText: 'Address')),
+              TextField(controller: _address, decoration: InputDecoration(labelText: tx('Address', 'العنوان'))),
               const SizedBox(height: 12),
-              TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note')),
+              TextField(controller: _note, decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'))),
             ]),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
           FilledButton(
             onPressed: () {
-              if (_name.text.trim().isEmpty) return toast(context, 'Enter a name.');
+              if (_name.text.trim().isEmpty) return toast(context, tx('Enter a name.', 'أدخل الاسم.'));
               String? v(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
               final client = Client(
                 id: widget.c?.id ?? widget.store.newId('c'),
@@ -294,7 +298,7 @@ class _ClientFormState extends State<_ClientForm> {
               widget.store.saveClient(client);
               Navigator.pop(context, client.id);
             },
-            child: const Text('Save'),
+            child: Text(tx('Save', 'حفظ')),
           ),
         ],
       );

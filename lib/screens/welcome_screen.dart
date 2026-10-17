@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../platform/files.dart';
 import '../store.dart';
 import '../ui.dart';
@@ -17,7 +18,7 @@ class WelcomeScreen extends StatelessWidget {
     try {
       store.applyJson(jsonDecode(text) as Map<String, dynamic>);
     } catch (e) {
-      if (context.mounted) toast(context, 'That file is not a data file or backup from this app.');
+      if (context.mounted) toast(context, tx('That file is not a data file or backup from this app.', 'هذا الملف ليس ملف بيانات أو نسخة احتياطية من هذا التطبيق.'));
     }
   }
 
@@ -57,40 +58,46 @@ class WelcomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(18)),
-                      child: const Icon(Icons.inventory_2, color: Colors.white, size: 34),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(18)),
+                        child: const Icon(Icons.inventory_2, color: Colors.white, size: 34),
+                      ),
+                      const Spacer(),
+                      LanguageChips(store: store),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Run your business\nwithout bookkeeping',
+                    tx('Run your business\nwithout bookkeeping', 'أدِر عملك\nبدون محاسبة معقدة'),
                     style: t.textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 24),
-                  point(Icons.receipt_long, 'Bill clients', 'Invoices, part payments and who owes you what.'),
+                  point(Icons.receipt_long, tx('Bill clients', 'فوترة الزبائن'),
+                      tx('Invoices, part payments and who owes you what.', 'الفواتير والدفعات الجزئية ومن عليه دين لك.')),
                   point(
                     Icons.layers_outlined,
-                    'Know your stock value',
-                    'Every purchase is a cost layer; the oldest is used first.',
+                    tx('Know your stock value', 'اعرف قيمة مخزونك'),
+                    tx('Every purchase is a cost layer; the oldest is used first.', 'كل شراء طبقة بكلفتها، والأقدم يُصرف أولاً.'),
                   ),
-                  point(Icons.savings_outlined, 'See your real profit', 'In plain words, by month, with an assistant to ask.'),
+                  point(Icons.savings_outlined, tx('See your real profit', 'شاهد ربحك الحقيقي'),
+                      tx('In plain words, by month, with an assistant to ask.', 'بكلمات بسيطة، شهراً بشهر، مع مساعد تسأله.')),
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => _load(context),
                     icon: const Icon(Icons.upload_file),
-                    label: const Text('Load data file or backup'),
+                    label: Text(tx('Load data file or backup', 'تحميل ملف بيانات أو نسخة احتياطية')),
                   ),
                   const SizedBox(height: 10),
-                  OutlinedButton(onPressed: store.startEmpty, child: const Text('Start fresh')),
+                  OutlinedButton(onPressed: store.startEmpty, child: Text(tx('Start fresh', 'ابدأ من جديد'))),
                   const SizedBox(height: 16),
                   Text(
-                    'Your data stays on this device. Export a backup from Settings each week.',
+                    tx('Your data stays on this device. Export a backup from Settings each week.',
+                        'بياناتك تبقى على هذا الجهاز. صدّر نسخة احتياطية من الإعدادات كل أسبوع.'),
                     textAlign: TextAlign.center,
                     style: t.textTheme.bodySmall,
                   ),
@@ -102,4 +109,24 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// English / العربية switch, shown on the welcome screen and in Settings.
+class LanguageChips extends StatelessWidget {
+  const LanguageChips({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: 8,
+        children: [
+          for (final (code, label) in [('en', 'English'), ('ar', 'العربية')])
+            ChoiceChip(
+              label: Text(label),
+              selected: store.lang == code,
+              showCheckmark: false,
+              onSelected: (_) => store.setLang(code),
+            ),
+        ],
+      );
 }

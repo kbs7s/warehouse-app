@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:warehouse_app/claude.dart';
+import 'package:warehouse_app/l10n.dart';
 import 'package:warehouse_app/main.dart';
 import 'package:warehouse_app/models.dart';
 import 'package:warehouse_app/pdf.dart';
@@ -145,6 +147,30 @@ void main() {
           await t.tap(find.widgetWithText(ChoiceChip, p));
           await t.pumpAndSettle();
         }
+      }
+      expect(t.takeException(), isNull);
+    });
+  }
+
+  for (final (name, setSize) in [('phone', phone), ('iPad', ipad)]) {
+    testWidgets('Arabic interface opens every section right to left on $name', (t) async {
+      setSize(t);
+      isAr = true;
+      addTearDown(() => isAr = false);
+      store.saveExpense(Expense(id: 'e1', date: '2026-10-03', category: 'Rent', amount: 300000));
+      await t.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        locale: const Locale('ar'),
+        supportedLocales: const [Locale('en'), Locale('ar')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: HomeShell(store: store),
+      ));
+      await t.pumpAndSettle();
+      expect(find.text('صرف إلى قسم'), findsWidgets);
+      expect(Directionality.of(t.element(find.byType(HomeShell))), TextDirection.rtl);
+      for (final section in ['الصرف', 'المخزون', 'المالية', 'المساعد', 'الرئيسية']) {
+        await t.tap(find.text(section).last);
+        await t.pumpAndSettle();
       }
       expect(t.takeException(), isNull);
     });

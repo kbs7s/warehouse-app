@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -12,11 +13,11 @@ class EquipmentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Surgery equipment'), bottom: SubNav.bar(context)),
+        appBar: AppBar(title: Text(tx('Surgery equipment', 'معدات العمليات')), bottom: SubNav.bar(context)),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(context, null),
           icon: const Icon(Icons.add),
-          label: const Text('New tool'),
+          label: Text(tx('New tool', 'أداة جديدة')),
         ),
         body: ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
@@ -29,17 +30,21 @@ class EquipmentScreen extends StatelessWidget {
               title: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: NameText(e.name, style: const TextStyle(fontSize: 17))),
-              subtitle: Text('Received ${fmtDate(e.dateReceived)} · start ${fmtQty(e.startQty)} · '
-                  'bought ${fmtQty(e.boughtQty)} · used ${e.usedQty}'
-                  '${e.usageDates.isEmpty ? '' : ' (last ${fmtDate(e.usageDates.last)})'}'),
+              subtitle: Text(tx(
+                  'Received ${fmtDate(e.dateReceived)} · start ${fmtQty(e.startQty)} · '
+                      'bought ${fmtQty(e.boughtQty)} · used ${e.usedQty}'
+                      '${e.usageDates.isEmpty ? '' : ' (last ${fmtDate(e.usageDates.last)})'}',
+                  'استُلمت ${fmtDate(e.dateReceived)} · البداية ${fmtQty(e.startQty)} · '
+                      'المشترى ${fmtQty(e.boughtQty)} · استُخدمت ${e.usedQty}'
+                      '${e.usageDates.isEmpty ? '' : ' (آخرها ${fmtDate(e.usageDates.last)})'}')),
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('${fmtQty(e.nowQty)} now', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                Text(tx('${fmtQty(e.nowQty)} now', 'الآن ${fmtQty(e.nowQty)}'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 12),
                 FilledButton.tonal(
                   onPressed: () async {
                     final d = await showDatePicker(
                         context: context,
-                        helpText: 'Date used',
+                        helpText: tx('Date used', 'تاريخ الاستخدام'),
                         initialDate: DateTime.now(),
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2100));
@@ -47,7 +52,7 @@ class EquipmentScreen extends StatelessWidget {
                     e.usageDates = [...e.usageDates, isoDate(d)]..sort();
                     store.saveEquipment(e, index: i);
                   },
-                  child: const Text('Record use'),
+                  child: Text(tx('Record use', 'تسجيل استخدام')),
                 ),
               ]),
             );
@@ -78,7 +83,7 @@ class _EquipmentFormState extends State<_EquipmentForm> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(_e == null ? 'New surgery tool' : 'Edit tool'),
+        title: Text(_e == null ? tx('New surgery tool', 'أداة عمليات جديدة') : tx('Edit tool', 'تعديل الأداة')),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
@@ -88,7 +93,7 @@ class _EquipmentFormState extends State<_EquipmentForm> {
                 builder: (_, _) => TextField(
                     controller: _name,
                     textDirection: dirOf(_name.text),
-                    decoration: const InputDecoration(labelText: 'Name')),
+                    decoration: InputDecoration(labelText: tx('Name', 'الاسم'))),
               ),
               const SizedBox(height: 12),
               Row(children: [
@@ -96,13 +101,13 @@ class _EquipmentFormState extends State<_EquipmentForm> {
                     child: TextField(
                         controller: _start,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Starting quantity'))),
+                        decoration: InputDecoration(labelText: tx('Starting quantity', 'الكمية الأولى')))),
                 const SizedBox(width: 12),
                 Expanded(
                     child: TextField(
                         controller: _bought,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Bought since'))),
+                        decoration: InputDecoration(labelText: tx('Bought since', 'المشترى بعدها')))),
               ]),
               const SizedBox(height: 12),
               InkWell(
@@ -115,10 +120,10 @@ class _EquipmentFormState extends State<_EquipmentForm> {
                   if (d != null) setState(() => _received = isoDate(d));
                 },
                 child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Date received'), child: Text(fmtDate(_received))),
+                    decoration: InputDecoration(labelText: tx('Date received', 'تاريخ الاستلام')), child: Text(fmtDate(_received))),
               ),
               const SizedBox(height: 16),
-              Text('Used on (${_dates.length})', style: Theme.of(context).textTheme.titleMedium),
+              Text(tx('Used on (${_dates.length})', 'تواريخ الاستخدام (${_dates.length})'), style: Theme.of(context).textTheme.titleMedium),
               Wrap(spacing: 8, children: [
                 for (final d in _dates)
                   InputChip(label: Text(fmtDate(d)), onDeleted: () => setState(() => _dates.remove(d))),
@@ -130,19 +135,19 @@ class _EquipmentFormState extends State<_EquipmentForm> {
           if (_e != null)
             TextButton(
               onPressed: () async {
-                if (await confirm(context, 'Delete this tool?', 'Its usage dates are deleted too.')) {
+                if (await confirm(context, tx('Delete this tool?', 'حذف هذه الأداة؟'), tx('Its usage dates are deleted too.', 'ستُحذف تواريخ استخدامها أيضاً.'))) {
                   widget.store.deleteEquipment(widget.index!);
                   if (context.mounted) Navigator.pop(context);
                 }
               },
-              child: const Text('Delete'),
+              child: Text(tx('Delete', 'حذف')),
             ),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
           FilledButton(
             onPressed: () {
               final start = parseNum(_start.text), bought = parseNum(_bought.text);
               if (_name.text.trim().isEmpty || start == null || bought == null) {
-                return toast(context, 'Enter a name and quantities.');
+                return toast(context, tx('Enter a name and quantities.', 'أدخل الاسم والكميات.'));
               }
               widget.store.saveEquipment(
                   Equipment(
@@ -154,7 +159,7 @@ class _EquipmentFormState extends State<_EquipmentForm> {
                   index: widget.index);
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(tx('Save', 'حفظ')),
           ),
         ],
       );

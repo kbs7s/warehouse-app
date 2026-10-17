@@ -1,3 +1,4 @@
+import 'l10n.dart';
 import 'models.dart';
 import 'store.dart';
 import 'ui.dart';
@@ -25,30 +26,36 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
   final overdue = s.overdue(today);
   if (overdue.isNotEmpty) {
     final total = overdue.fold<num>(0, (t, i) => t + i.balance);
-    final names = {for (final i in overdue) s.client(i.clientId)?.name ?? 'No client'}.take(3).join(', ');
-    out.add(Insight(InsightLevel.urgent, '${overdue.length} overdue ${overdue.length == 1 ? 'invoice' : 'invoices'}: ${fmtMoney(total)}',
-        'Past the due date and not fully paid ($names). A short reminder usually gets these paid.',
+    final names = {for (final i in overdue) s.client(i.clientId)?.name ?? tx('No client', 'بدون زبون')}.take(3).join(', ');
+    out.add(Insight(InsightLevel.urgent, tx('${overdue.length} overdue ${overdue.length == 1 ? 'invoice' : 'invoices'}: ${fmtMoney(total)}',
+            '${overdue.length} ${overdue.length == 1 ? 'فاتورة متأخرة' : 'فواتير متأخرة'}: ${fmtMoney(total)}'),
+        tx('Past the due date and not fully paid ($names). A short reminder usually gets these paid.',
+            'تجاوزت موعد الاستحقاق ولم تُدفع بالكامل ($names). تذكير قصير عادةً يكفي لتحصيلها.'),
         target: InsightTarget.invoices));
   }
 
   final short = s.ledger.shortfall.keys.where((id) => s.item(id)?.active ?? false).toList();
   if (short.isNotEmpty) {
-    out.add(Insight(InsightLevel.warning, '${short.length} items went below zero',
-        'More was given out than was ever recorded coming in (${short.take(3).map((id) => s.item(id)?.name ?? id).join('، ')}). '
-            'A purchase is probably missing, so profit for these items is estimated.',
+    out.add(Insight(InsightLevel.warning, tx('${short.length} items went below zero', '${short.length} مواد نزلت تحت الصفر'),
+        tx(
+            'More was given out than was ever recorded coming in (${short.take(3).map((id) => s.item(id)?.name ?? id).join('، ')}). '
+                'A purchase is probably missing, so profit for these items is estimated.',
+            'صُرف أكثر مما سُجّل دخوله (${short.take(3).map((id) => s.item(id)?.name ?? id).join('، ')}). '
+                'غالباً هناك شراء غير مسجّل، لذا ربح هذه المواد تقديري.'),
         target: InsightTarget.stock));
   }
 
   final out0 = s.stockList.where((x) => x.status == StockStatus.out).length;
   final low = s.stockList.where((x) => x.status == StockStatus.low).length;
   if (out0 + low > 0) {
-    out.add(Insight(InsightLevel.warning, 'Reorder soon: $low low, $out0 out of stock',
-        'These items are at or under the minimum level you set.', target: InsightTarget.stock));
+    out.add(Insight(InsightLevel.warning, tx('Reorder soon: $low low, $out0 out of stock', 'أعد الطلب قريباً: $low منخفض، $out0 نفد'),
+        tx('These items are at or under the minimum level you set.', 'هذه المواد عند الحد الأدنى الذي حددته أو أقل.'), target: InsightTarget.stock));
   }
 
   if (s.weOwe > 0) {
-    out.add(Insight(InsightLevel.tip, 'You owe suppliers ${fmtMoney(s.weOwe)}',
-        'Unpaid supplier bills. Plan these payments against the money clients owe you (${fmtMoney(s.owedToUs)}).',
+    out.add(Insight(InsightLevel.tip, tx('You owe suppliers ${fmtMoney(s.weOwe)}', 'عليك للمجهزين ${fmtMoney(s.weOwe)}'),
+        tx('Unpaid supplier bills. Plan these payments against the money clients owe you (${fmtMoney(s.owedToUs)}).',
+            'فواتير مجهزين غير مدفوعة. خطط لدفعها مقابل ما على الزبائن لك (${fmtMoney(s.owedToUs)}).'),
         target: InsightTarget.supplierBills));
   }
 
@@ -58,34 +65,41 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
   if (thisM.sales > 0 || lastM.sales > 0) {
     final up = thisM.profit >= lastM.profit;
     out.add(Insight(up ? InsightLevel.good : InsightLevel.warning,
-        'Profit this month: ${fmtMoney(thisM.profit)} (${up ? 'up' : 'down'} from ${fmtMoney(lastM.profit)} last month)',
+        tx('Profit this month: ${fmtMoney(thisM.profit)} (${up ? 'up' : 'down'} from ${fmtMoney(lastM.profit)} last month)',
+            'ربح هذا الشهر: ${fmtMoney(thisM.profit)} (${up ? 'أعلى' : 'أقل'} من ${fmtMoney(lastM.profit)} الشهر الماضي)'),
         thisM.sales == 0
-            ? 'No sales invoiced yet this month.'
-            : 'You keep ${(thisM.margin * 100).toStringAsFixed(0)} of every 100 IQD you sell after all costs.',
+            ? tx('No sales invoiced yet this month.', 'لا توجد مبيعات مفوترة هذا الشهر بعد.')
+            : tx('You keep ${(thisM.margin * 100).toStringAsFixed(0)} of every 100 IQD you sell after all costs.',
+                'يبقى لك ${(thisM.margin * 100).toStringAsFixed(0)} من كل 100 $currency تبيعها بعد كل التكاليف.'),
         target: InsightTarget.money));
     if (thisM.sales > 0 && thisM.margin < .1) {
-      out.add(Insight(InsightLevel.warning, 'Thin margin this month',
-          'Less than 10% of sales is left as profit. Check selling prices against item costs.', target: InsightTarget.money));
+      out.add(Insight(InsightLevel.warning, tx('Thin margin this month', 'هامش ربح ضعيف هذا الشهر'),
+          tx('Less than 10% of sales is left as profit. Check selling prices against item costs.',
+              'أقل من 10% من المبيعات يبقى ربحاً. راجع أسعار البيع مقابل كلفة المواد.'), target: InsightTarget.money));
     }
   }
 
   if (thisM.expensesByCategory.isNotEmpty) {
     final top = thisM.expensesByCategory.entries.reduce((a, b) => a.value >= b.value ? a : b);
-    out.add(Insight(InsightLevel.tip, 'Biggest running cost this month: ${top.key}',
-        '${fmtMoney(top.value)} of ${fmtMoney(thisM.expenses)} in expenses.', target: InsightTarget.money));
+    out.add(Insight(InsightLevel.tip, tx('Biggest running cost this month: ${top.key}', 'أكبر مصروف تشغيلي هذا الشهر: ${top.key}'),
+        tx('${fmtMoney(top.value)} of ${fmtMoney(thisM.expenses)} in expenses.', '${fmtMoney(top.value)} من ${fmtMoney(thisM.expenses)} مصاريف.'), target: InsightTarget.money));
   }
 
   final estimated = s.ledger.layers.values.expand((l) => l).where((l) => l.estimatedCost && l.unitCost == 0).length;
   if (estimated > 0) {
-    out.add(Insight(InsightLevel.tip, '$estimated items have opening stock with no cost',
-        'Their stock value counts as zero. Add the cost per unit on each item so profit is accurate.',
+    out.add(Insight(InsightLevel.tip, tx('$estimated items have opening stock with no cost', '$estimated مواد لها رصيد افتتاحي بدون كلفة'),
+        tx('Their stock value counts as zero. Add the cost per unit on each item so profit is accurate.',
+            'قيمتها في المخزون تُحسب صفراً. أضف كلفة الوحدة لكل مادة ليكون الربح دقيقاً.'),
         target: InsightTarget.items));
   }
 
   final last = s.lastBackupAt == null ? null : DateTime.tryParse(s.lastBackupAt!);
   if (last == null || n.difference(last).inDays > 7) {
-    out.add(Insight(InsightLevel.warning, last == null ? 'No backup yet' : 'Last backup ${n.difference(last).inDays} days ago',
-        'Your records live only on this device. Export a backup to Files or iCloud Drive.', target: InsightTarget.settings));
+    out.add(Insight(InsightLevel.warning, last == null
+            ? tx('No backup yet', 'لا توجد نسخة احتياطية بعد')
+            : tx('Last backup ${n.difference(last).inDays} days ago', 'آخر نسخة احتياطية قبل ${n.difference(last).inDays} يوم'),
+        tx('Your records live only on this device. Export a backup to Files or iCloud Drive.',
+            'سجلاتك موجودة على هذا الجهاز فقط. صدّر نسخة احتياطية إلى Files أو iCloud Drive.'), target: InsightTarget.settings));
   }
 
   out.sort((a, b) => a.level.index.compareTo(b.level.index));

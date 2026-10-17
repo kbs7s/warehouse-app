@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -30,22 +31,22 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Purchases'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Purchases', 'المشتريات')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openPurchase(context, widget.store, null),
         icon: const Icon(Icons.add),
-        label: const Text('New purchase'),
+        label: Text(tx('New purchase', 'شراء جديد')),
       ),
       body: CardList(
-        empty: 'No purchases found.',
-        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Purchase number, supplier or item')],
+        empty: tx('No purchases found.', 'لا توجد مشتريات.'),
+        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Purchase number, supplier or item', 'رقم الشراء أو المجهز أو المادة'))],
         itemCount: list.length,
         itemBuilder: (_, i) {
           final p = list[i];
           return ListTile(
             leading: CircleAvatar(child: Text('${p.no}')),
-            title: NameText(p.supplier ?? 'No supplier', style: const TextStyle(fontSize: 17)),
-            subtitle: Text('${fmtDate(p.date)}  ·  ${p.lines.length} items'),
+            title: NameText(p.supplier ?? tx('No supplier', 'بدون مجهز'), style: const TextStyle(fontSize: 17)),
+            subtitle: Text(tx('${fmtDate(p.date)}  ·  ${p.lines.length} items', '${fmtDate(p.date)}  ·  ${p.lines.length} مادة')),
             trailing: Text(fmtMoney(p.total), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             onTap: () => openPurchase(context, widget.store, p),
           );
@@ -107,14 +108,14 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
 
   Future<void> _save() async {
     final no = int.tryParse(_no.text.trim());
-    if (no == null) return toast(context, 'Enter a purchase number.');
+    if (no == null) return toast(context, tx('Enter a purchase number.', 'أدخل رقم الشراء.'));
     if (no != widget.existing?.no && store.purchases.any((p) => p.no == no)) {
-      return toast(context, 'Purchase number $no already exists.');
+      return toast(context, tx('Purchase number $no already exists.', 'رقم الشراء $no موجود مسبقاً.'));
     }
     final lines = <PurchaseLine>[];
     for (final l in _lines) {
       final q = parseNum(l.qty.text);
-      if (q == null || q <= 0) return toast(context, 'Enter a quantity for ${store.item(l.itemId)?.name}.');
+      if (q == null || q <= 0) return toast(context, tx('Enter a quantity for ${store.item(l.itemId)?.name}.', 'أدخل الكمية لـ ${store.item(l.itemId)?.name}.'));
       lines.add(
         PurchaseLine(
           itemId: l.itemId,
@@ -125,7 +126,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
         ),
       );
     }
-    if (lines.isEmpty) return toast(context, 'Add at least one item.');
+    if (lines.isEmpty) return toast(context, tx('Add at least one item.', 'أضف مادة واحدة على الأقل.'));
     String? t(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
     store.savePurchase(
       Purchase(no: no, date: _date, supplier: t(_supplier), note: t(_note), lines: lines),
@@ -137,17 +138,19 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.existing == null ? 'New purchase' : 'Purchase #${widget.existing!.no}'),
+      title: Text(widget.existing == null
+          ? tx('New purchase', 'شراء جديد')
+          : tx('Purchase #${widget.existing!.no}', 'شراء رقم ${widget.existing!.no}')),
       actions: [
         if (widget.existing != null)
           IconButton(
-            tooltip: 'Delete purchase',
+            tooltip: tx('Delete purchase', 'حذف الشراء'),
             icon: const Icon(Icons.delete_outline),
             onPressed: () async {
               if (await confirm(
                 context,
-                'Delete purchase #${widget.existing!.no}?',
-                'The items on it are taken back out of stock.',
+                tx('Delete purchase #${widget.existing!.no}?', 'حذف الشراء رقم ${widget.existing!.no}؟'),
+                tx('The items on it are taken back out of stock.', 'ستُخرج مواده من المخزون.'),
               )) {
                 store.deletePurchase(widget.existing!.no);
                 if (context.mounted) Navigator.pop(context);
@@ -156,7 +159,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
           ),
         Padding(
           padding: const EdgeInsets.only(right: 12),
-          child: FilledButton(onPressed: _save, child: const Text('Save')),
+          child: FilledButton(onPressed: _save, child: Text(tx('Save', 'حفظ'))),
         ),
       ],
     ),
@@ -172,7 +175,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
               child: TextField(
                 controller: _no,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Purchase #', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: tx('Purchase #', 'رقم الشراء'), border: const OutlineInputBorder()),
               ),
             ),
             SizedBox(
@@ -188,21 +191,21 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
                   if (d != null) setState(() => _date = isoDate(d));
                 },
                 child: InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Date', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: tx('Date', 'التاريخ'), border: const OutlineInputBorder()),
                   child: Text(fmtDate(_date)),
                 ),
               ),
             ),
             SizedBox(
               width: 300,
-              child: SuggestField(label: 'Supplier', controller: _supplier, options: store.suppliers),
+              child: SuggestField(label: tx('Supplier', 'المجهز'), controller: _supplier, options: store.suppliers),
             ),
           ],
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _note,
-          decoration: const InputDecoration(labelText: 'Note', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'), border: const OutlineInputBorder()),
         ),
         const SizedBox(height: 24),
         Wrap(
@@ -210,16 +213,16 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Items', style: Theme.of(context).textTheme.titleLarge),
-            Text('Total: ${fmtMoney(_grandTotal)}', style: Theme.of(context).textTheme.titleMedium),
-            FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Add item')),
+            Text(tx('Items', 'المواد'), style: Theme.of(context).textTheme.titleLarge),
+            Text(tx('Total: ${fmtMoney(_grandTotal)}', 'المجموع: ${fmtMoney(_grandTotal)}'), style: Theme.of(context).textTheme.titleMedium),
+            FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.add), label: Text(tx('Add item', 'إضافة مادة'))),
           ],
         ),
         const SizedBox(height: 8),
         if (_lines.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: Text('Tap "Add item" to start.')),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(child: Text(tx('Tap "Add item" to start.', 'اضغط "إضافة مادة" للبدء.'))),
           ),
         for (final (i, l) in _lines.indexed) _lineRow(i, l),
       ],
@@ -258,7 +261,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
       ),
     );
     final remove = IconButton(
-      tooltip: 'Remove',
+      tooltip: tx('Remove', 'إزالة'),
       icon: const Icon(Icons.close),
       onPressed: () => setState(() => _lines.removeAt(i)),
     );
@@ -273,9 +276,9 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(child: field(l.qty, 'Qty', double.infinity, onChanged: () => _recalc(l))),
-                      Expanded(child: field(l.price, 'Unit price', double.infinity, onChanged: () => _recalc(l))),
-                      Expanded(child: field(l.total, 'Total', double.infinity)),
+                      Expanded(child: field(l.qty, tx('Qty', 'الكمية'), double.infinity, onChanged: () => _recalc(l))),
+                      Expanded(child: field(l.price, tx('Unit price', 'سعر الوحدة'), double.infinity, onChanged: () => _recalc(l))),
+                      Expanded(child: field(l.total, tx('Total', 'المجموع'), double.infinity)),
                     ],
                   ),
                 ],
@@ -287,9 +290,9 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
                     child: Text('${i + 1}', style: const TextStyle(color: Colors.grey)),
                   ),
                   name,
-                  field(l.qty, 'Qty', 100, onChanged: () => _recalc(l)),
-                  field(l.price, 'Unit price', 130, onChanged: () => _recalc(l)),
-                  field(l.total, 'Total (IQD)', 150),
+                  field(l.qty, tx('Qty', 'الكمية'), 100, onChanged: () => _recalc(l)),
+                  field(l.price, tx('Unit price', 'سعر الوحدة'), 130, onChanged: () => _recalc(l)),
+                  field(l.total, tx('Total (IQD)', 'المجموع (د.ع)'), 150),
                   remove,
                 ],
               ),

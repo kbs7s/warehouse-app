@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../pdf.dart';
 import '../shell.dart';
@@ -32,15 +33,15 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Issues to departments'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Issues to departments', 'الصرف إلى الأقسام')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openReceipt(context, store, null),
         icon: const Icon(Icons.add),
-        label: const Text('Issue supplies'),
+        label: Text(tx('Issue supplies', 'صرف مواد')),
       ),
       body: CardList(
-        empty: 'No issue receipts found.',
-        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Receipt number, department, person or item')],
+        empty: tx('No issue receipts found.', 'لا توجد وصولات صرف.'),
+        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Receipt number, department, person or item', 'رقم الوصل أو القسم أو المستلم أو المادة'))],
         itemCount: list.length,
         itemBuilder: (_, i) {
           final r = list[i];
@@ -48,11 +49,11 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
             leading: CircleAvatar(child: Text('${r.no}')),
             title: Row(
               children: [
-                Flexible(child: NameText(r.department ?? 'No department', style: const TextStyle(fontSize: 17))),
+                Flexible(child: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontSize: 17))),
                 if (r.customer != null) ...[const Text('  ·  '), Flexible(child: NameText(r.customer!))],
               ],
             ),
-            subtitle: Text('${fmtDate(r.date)}  ·  ${r.lines.length} items'),
+            subtitle: Text(tx('${fmtDate(r.date)}  ·  ${r.lines.length} items', '${fmtDate(r.date)}  ·  ${r.lines.length} مادة')),
             trailing: IconButton(
               tooltip: 'PDF',
               icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -116,18 +117,18 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
 
   Receipt? _build() {
     final no = int.tryParse(_no.text.trim());
-    if (no == null) return _fail('Enter a receipt number.');
+    if (no == null) return _fail(tx('Enter a receipt number.', 'أدخل رقم الوصل.'));
     if (no != widget.existing?.no && store.receipts.any((r) => r.no == no)) {
-      return _fail('Receipt number $no already exists.');
+      return _fail(tx('Receipt number $no already exists.', 'رقم الوصل $no موجود مسبقاً.'));
     }
-    if (_dept.text.trim().isEmpty) return _fail('Choose the department.');
+    if (_dept.text.trim().isEmpty) return _fail(tx('Choose the department.', 'اختر القسم.'));
     final lines = <ReceiptLine>[];
     for (final l in _lines) {
       final q = parseNum(l.qty.text);
-      if (q == null || q <= 0) return _fail('Enter a quantity for ${store.item(l.itemId)?.name}.');
+      if (q == null || q <= 0) return _fail(tx('Enter a quantity for ${store.item(l.itemId)?.name}.', 'أدخل الكمية لـ ${store.item(l.itemId)?.name}.'));
       lines.add(ReceiptLine(itemId: l.itemId, qty: q));
     }
-    if (lines.isEmpty) return _fail('Add at least one item.');
+    if (lines.isEmpty) return _fail(tx('Add at least one item.', 'أضف مادة واحدة على الأقل.'));
     String? t(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
     return Receipt(no: no, date: _date, department: t(_dept), customer: t(_person), note: t(_note), lines: lines);
   }
@@ -141,13 +142,19 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     final r = _build();
     if (r == null) return;
     final over = r.lines.where((l) => l.qty > _available(l.itemId)).toList();
+    String overLine(ReceiptLine l) {
+      final q = fmtQty(l.qty), a = fmtQty(_available(l.itemId));
+      return '• ${store.item(l.itemId)?.name}: ${tx('issuing $q, only $a in stock', 'صرف $q، والموجود $a فقط')}';
+    }
+
     if (over.isNotEmpty &&
         !await confirm(
           context,
-          'Not enough stock',
-          'These items would go below zero:\n\n${over.map((l) => '• ${store.item(l.itemId)?.name}: '
-              'issuing ${fmtQty(l.qty)}, only ${fmtQty(_available(l.itemId))} in stock').join('\n')}\n\nSave anyway?',
-          action: 'Save anyway',
+          tx('Not enough stock', 'المخزون غير كافٍ'),
+          '${tx('These items would go below zero:', 'هذه المواد ستصبح دون الصفر:')}\n\n'
+          '${over.map(overLine).join('\n')}\n\n'
+          '${tx('Save anyway?', 'الحفظ على أي حال؟')}',
+          action: tx('Save anyway', 'احفظ على أي حال'),
         )) {
       return;
     }
@@ -165,23 +172,26 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existing == null ? 'New issue receipt' : 'Receipt #${widget.existing!.no}'),
+        title: Text(widget.existing == null
+            ? tx('New issue receipt', 'وصل صرف جديد')
+            : tx('Receipt #${widget.existing!.no}', 'وصل رقم ${widget.existing!.no}')),
         actions: [
           if (widget.existing != null)
             IconButton(
-              tooltip: 'Delete receipt',
+              tooltip: tx('Delete receipt', 'حذف الوصل'),
               icon: const Icon(Icons.delete_outline),
               onPressed: () async {
-                if (await confirm(context, 'Delete receipt #${widget.existing!.no}?', 'The items on it go back into stock.')) {
+                if (await confirm(context, tx('Delete receipt #${widget.existing!.no}?', 'حذف الوصل رقم ${widget.existing!.no}؟'),
+                    tx('The items on it go back into stock.', 'ستعود مواده إلى المخزون.'))) {
                   store.deleteReceipt(widget.existing!.no);
                   if (context.mounted) Navigator.pop(context);
                 }
               },
             ),
-          TextButton(onPressed: () => _save(pdf: true), child: const Text('Save & PDF')),
+          TextButton(onPressed: () => _save(pdf: true), child: Text(tx('Save & PDF', 'حفظ و PDF'))),
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(onPressed: _save, child: const Text('Save')),
+            child: FilledButton(onPressed: _save, child: Text(tx('Save', 'حفظ'))),
           ),
         ],
       ),
@@ -197,7 +207,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                 child: TextField(
                   controller: _no,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Receipt #', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: tx('Receipt #', 'رقم الوصل'), border: const OutlineInputBorder()),
                 ),
               ),
               SizedBox(
@@ -213,39 +223,39 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                     if (d != null) setState(() => _date = isoDate(d));
                   },
                   child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Date', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: tx('Date', 'التاريخ'), border: const OutlineInputBorder()),
                     child: Text(fmtDate(_date)),
                   ),
                 ),
               ),
               SizedBox(
                 width: 260,
-                child: SuggestField(label: 'Department', controller: _dept, options: store.departments),
+                child: SuggestField(label: tx('Department', 'القسم'), controller: _dept, options: store.departments),
               ),
               SizedBox(
                 width: 260,
-                child: SuggestField(label: 'Received by', controller: _person, options: people),
+                child: SuggestField(label: tx('Received by', 'المستلم'), controller: _person, options: people),
               ),
             ],
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _note,
-            decoration: const InputDecoration(labelText: 'Note', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'), border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 24),
           Row(
             children: [
-              Text('Items', style: Theme.of(context).textTheme.titleLarge),
+              Text(tx('Items', 'المواد'), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
-              FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Add item')),
+              FilledButton.tonalIcon(onPressed: _addItem, icon: const Icon(Icons.add), label: Text(tx('Add item', 'إضافة مادة'))),
             ],
           ),
           const SizedBox(height: 8),
           if (_lines.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text('Tap "Add item" to start.')),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(child: Text(tx('Tap "Add item" to start.', 'اضغط "إضافة مادة" للبدء.'))),
             ),
           for (final (i, l) in _lines.indexed) _lineRow(i, l),
         ],
@@ -273,7 +283,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                 children: [
                   NameText(item?.name ?? l.itemId, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                   Text(
-                    '${l.itemId}  ·  in stock: ${fmtQty(avail)}',
+                    tx('${l.itemId}  ·  in stock: ${fmtQty(avail)}', '${l.itemId}  ·  الموجود: ${fmtQty(avail)}'),
                     style: TextStyle(color: avail <= 0 ? Colors.red : Colors.grey.shade700),
                   ),
                 ],
@@ -286,14 +296,14 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                 autofocus: l.qty.text.isEmpty,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.end,
-                decoration: const InputDecoration(labelText: 'Qty', border: OutlineInputBorder(), isDense: true),
+                decoration: InputDecoration(labelText: tx('Qty', 'الكمية'), border: const OutlineInputBorder(), isDense: true),
               ),
             ),
             SizedBox(
               width: phone ? 56 : 90,
               child: Padding(padding: const EdgeInsets.only(left: 8), child: NameText(item?.unit ?? '')),
             ),
-            IconButton(tooltip: 'Remove', icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i))),
+            IconButton(tooltip: tx('Remove', 'إزالة'), icon: const Icon(Icons.close), onPressed: () => setState(() => _lines.removeAt(i))),
           ],
         ),
       ),

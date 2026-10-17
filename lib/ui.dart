@@ -8,9 +8,12 @@ import 'theme.dart';
 final _qtyFmt = intl.NumberFormat('#,##0.##', 'en');
 final _moneyFmt = intl.NumberFormat('#,##0', 'en');
 
-String fmtQty(num q) => _qtyFmt.format(q);
+// In Arabic a left-to-right mark keeps the minus sign in front of the digits ("-14", not "14-").
+String _ltr(num v, String s) => isAr && v < 0 ? '\u2066$s\u2069' : s;
+
+String fmtQty(num q) => _ltr(q, _qtyFmt.format(q));
 String get currency => tx('IQD', 'د.ع');
-String fmtMoney(num m) => '${_moneyFmt.format(m == 0 ? 0 : m)} $currency'; // never "-0"
+String fmtMoney(num m) => '${_ltr(m, _moneyFmt.format(m == 0 ? 0 : m))} $currency'; // never "-0"
 String fmtDate(String? iso) {
   if (iso == null) return '—';
   final d = DateTime.tryParse(iso);
@@ -51,9 +54,9 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      StockStatus.inStock => ('In stock', Colors.green),
-      StockStatus.low => ('Low', Colors.orange),
-      StockStatus.out => ('Out', Colors.red),
+      StockStatus.inStock => (tx('In stock', 'متوفر'), Colors.green),
+      StockStatus.low => (tx('Low', 'منخفض'), Colors.orange),
+      StockStatus.out => (tx('Out', 'نفد'), Colors.red),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -63,15 +66,15 @@ class StatusChip extends StatelessWidget {
   }
 }
 
-Future<bool> confirm(BuildContext context, String title, String message, {String action = 'Delete'}) async =>
+Future<bool> confirm(BuildContext context, String title, String message, {String? action}) async =>
     await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(action)),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tx('Cancel', 'إلغاء'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(action ?? tx('Delete', 'حذف'))),
         ],
       ),
     ) ??
@@ -82,15 +85,15 @@ void toast(BuildContext context, String msg) =>
 
 /// Big search field used at the top of list screens.
 class SearchField extends StatelessWidget {
-  const SearchField({super.key, required this.onChanged, this.hint = 'Search'});
+  const SearchField({super.key, required this.onChanged, this.hint});
   final ValueChanged<String> onChanged;
-  final String hint;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) => TextField(
         onChanged: onChanged,
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: hint ?? tx('Search', 'بحث'),
           prefixIcon: const Icon(Icons.search),
           border: const OutlineInputBorder(),
           isDense: true,
@@ -110,10 +113,11 @@ String fmtMoneyShort(num m) {
   final a = m.abs();
   final sign = m < 0 ? '−' : '';
   final c = currency;
-  if (a >= 1e9) return '$sign${(a / 1e9).toStringAsFixed(2)}${tx('B', ' مليار')} $c';
-  if (a >= 1e6) return '$sign${(a / 1e6).toStringAsFixed(a >= 1e8 ? 0 : 2)}${tx('M', ' مليون')} $c';
-  if (a >= 1e4) return '$sign${(a / 1e3).toStringAsFixed(0)}${tx('K', ' ألف')} $c';
-  return '$sign${_moneyFmt.format(a)} $c';
+  String n(String digits) => _ltr(m, '$sign$digits');
+  if (a >= 1e9) return '${n((a / 1e9).toStringAsFixed(2))}${tx('B', ' مليار')} $c';
+  if (a >= 1e6) return '${n((a / 1e6).toStringAsFixed(a >= 1e8 ? 0 : 2))}${tx('M', ' مليون')} $c';
+  if (a >= 1e4) return '${n((a / 1e3).toStringAsFixed(0))}${tx('K', ' ألف')} $c';
+  return '${n(_moneyFmt.format(a))} $c';
 }
 
 bool isPhone(BuildContext context) => MediaQuery.sizeOf(context).width < 640;
@@ -290,7 +294,7 @@ class BarChart extends StatelessWidget {
           Row(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 10, height: 10, decoration: BoxDecoration(color: AppColors.bad, borderRadius: BorderRadius.circular(3))),
             const SizedBox(width: 6),
-            Text('Loss', style: t.textTheme.bodySmall),
+            Text(tx('Loss', 'خسارة'), style: t.textTheme.bodySmall),
           ]),
       ]),
       const SizedBox(height: 12),
@@ -329,11 +333,11 @@ class BarChart extends StatelessWidget {
 
 /// A long list inside a rounded card, width-limited, with controls (filters, search) above it.
 class CardList extends StatelessWidget {
-  const CardList({super.key, required this.header, required this.itemCount, required this.itemBuilder, this.empty = 'Nothing here yet.'});
+  const CardList({super.key, required this.header, required this.itemCount, required this.itemBuilder, this.empty});
   final List<Widget> header;
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
-  final String empty;
+  final String? empty;
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +352,7 @@ class CardList extends StatelessWidget {
             const SizedBox(height: 12),
             Expanded(
               child: itemCount == 0
-                  ? EmptyState(icon: Icons.search_off, title: empty)
+                  ? EmptyState(icon: Icons.search_off, title: empty ?? tx('Nothing here yet.', 'لا يوجد شيء بعد.'))
                   : Card(
                       clipBehavior: Clip.antiAlias,
                       margin: const EdgeInsets.only(bottom: 12),

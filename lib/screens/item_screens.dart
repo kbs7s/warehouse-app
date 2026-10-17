@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -26,57 +27,69 @@ class ItemDetailScreen extends StatelessWidget {
                 TextButton.icon(
                     onPressed: () => editItem(context, store, s.item),
                     icon: const Icon(Icons.edit),
-                    label: const Text('Edit')),
+                    label: Text(tx('Edit', 'تعديل'))),
                 const SizedBox(width: 8),
               ],
             ),
             body: PageBody(maxWidth: 900, children: [
               TileGrid(children: [
-                MetricTile(label: 'In stock', value: '${fmtQty(s.qty)} ${s.item.unit}', icon: Icons.inventory_2_outlined,
+                MetricTile(label: tx('In stock', 'الموجود'), value: '${fmtQty(s.qty)} ${s.item.unit}', icon: Icons.inventory_2_outlined,
                     color: s.status == StockStatus.inStock ? null : (s.status == StockStatus.low ? AppColors.warn : AppColors.bad),
-                    hint: 'Minimum ${fmtQty(s.item.minLevel)}'),
-                MetricTile(label: 'Stock value', value: fmtMoneyShort(value), icon: Icons.layers_outlined, hint: 'What it cost you'),
-                MetricTile(label: 'Sold', value: fmtQty(s.sold), icon: Icons.sell_outlined,
-                    hint: s.item.salePrice == null ? 'No usual price set' : 'Usual price ${fmtMoney(s.item.salePrice!)}'),
-                MetricTile(label: 'Given to departments', value: fmtQty(s.issued), icon: Icons.outbox_outlined,
-                    hint: 'Opening ${fmtQty(s.item.openingQty)} · bought ${fmtQty(s.bought)}'),
+                    hint: tx('Minimum ${fmtQty(s.item.minLevel)}', 'الحد الأدنى ${fmtQty(s.item.minLevel)}')),
+                MetricTile(
+                    label: tx('Stock value', 'قيمة المخزون'),
+                    value: fmtMoneyShort(value),
+                    icon: Icons.layers_outlined,
+                    hint: tx('What it cost you', 'ما كلّفك')),
+                MetricTile(label: tx('Sold', 'المباع'), value: fmtQty(s.sold), icon: Icons.sell_outlined,
+                    hint: s.item.salePrice == null
+                        ? tx('No usual price set', 'لا يوجد سعر بيع معتاد')
+                        : tx('Usual price ${fmtMoney(s.item.salePrice!)}', 'سعر البيع المعتاد ${fmtMoney(s.item.salePrice!)}')),
+                MetricTile(label: tx('Given to departments', 'المصروف إلى الأقسام'), value: fmtQty(s.issued), icon: Icons.outbox_outlined,
+                    hint: tx('Opening ${fmtQty(s.item.openingQty)} · bought ${fmtQty(s.bought)}',
+                        'الافتتاحي ${fmtQty(s.item.openingQty)} · المشترى ${fmtQty(s.bought)}')),
               ]),
-              if (s.item.note != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Note: ${s.item.note}')),
-              SectionTitle('Cost layers', trailing: Text(s.item.id, style: t.textTheme.bodySmall)),
-              Text('Each batch you bought keeps its own price. Sales and issues use the oldest batch first.',
+              if (s.item.note != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tx('Note: ${s.item.note}', 'ملاحظة: ${s.item.note}'))),
+              SectionTitle(tx('Cost layers', 'دفعات الكلفة'), trailing: Text(s.item.id, style: t.textTheme.bodySmall)),
+              Text(
+                  tx('Each batch you bought keeps its own price. Sales and issues use the oldest batch first.',
+                      'كل دفعة اشتريتها تحتفظ بسعرها. البيع والصرف يأخذان من أقدم دفعة أولاً.'),
                   style: t.textTheme.bodySmall!.copyWith(color: t.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 8),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(children: [
-                  if (layers.isEmpty) const ListTile(title: Text('Nothing left in stock.')),
+                  if (layers.isEmpty) ListTile(title: Text(tx('Nothing left in stock.', 'لم يبقَ شيء في المخزون.'))),
                   for (final (i, l) in layers.indexed) ...[
                     if (i > 0) const Divider(height: 1),
                     ListTile(
                       leading: CircleAvatar(
                           backgroundColor: t.colorScheme.primaryContainer.withValues(alpha: 1 - i * .15 < .3 ? .3 : 1 - i * .15),
                           child: Text('${i + 1}', style: TextStyle(color: t.colorScheme.onPrimaryContainer))),
-                      title: NameText(l.source, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text('${fmtQty(l.qtyLeft)} of ${fmtQty(l.qtyIn)} left · ${fmtMoney(l.unitCost)} each'
-                          '${l.date == null ? '' : ' · ${fmtDate(l.date)}'}'
-                          '${l.estimatedCost ? (l.unitCost == 0 ? ' · cost unknown' : ' · estimated cost') : ''}'),
+                      title: NameText(_source(l.source), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(tx('${fmtQty(l.qtyLeft)} of ${fmtQty(l.qtyIn)} left · ${fmtMoney(l.unitCost)} each',
+                              'باقي ${fmtQty(l.qtyLeft)} من ${fmtQty(l.qtyIn)} · ${fmtMoney(l.unitCost)} للوحدة') +
+                          (l.date == null ? '' : ' · ${fmtDate(l.date)}') +
+                          (l.estimatedCost
+                              ? (l.unitCost == 0 ? tx(' · cost unknown', ' · الكلفة غير معروفة') : tx(' · estimated cost', ' · كلفة تقديرية'))
+                              : '')),
                       trailing: Text(fmtMoney(l.valueLeft), style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ],
                 ]),
               ),
-              const SectionTitle('Movements'),
+              SectionTitle(tx('Movements', 'الحركات')),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(children: [
-                  if (moves.isEmpty) const ListTile(title: Text('No purchases, sales or issues yet.')),
+                  if (moves.isEmpty) ListTile(title: Text(tx('No purchases, sales or issues yet.', 'لا توجد مشتريات أو مبيعات أو صرف بعد.'))),
                   for (final (i, m) in moves.indexed) ...[
                     if (i > 0) const Divider(height: 1),
                     ListTile(
                       leading: Icon(m.qty > 0 ? Icons.south_west : Icons.north_east,
                           color: m.qty > 0 ? AppColors.good : (m.kind == 'Invoice' ? AppColors.info : Colors.blueGrey)),
                       title: Row(children: [
-                        Text('${m.kind} #${m.no}  ·  '),
+                        Text('${_kind(m.kind)} #${m.no}  ·  '),
                         Flexible(child: NameText(m.party)),
                       ]),
                       subtitle: Text(fmtDate(m.date)),
@@ -90,6 +103,24 @@ class ItemDetailScreen extends StatelessWidget {
           );
         },
       );
+}
+
+/// Movement kinds come from the store in English; shown in the interface language.
+String _kind(String k) => switch (k) {
+      'Purchase' => tx('Purchase', 'شراء'),
+      'Issue' => tx('Issue', 'صرف'),
+      'Invoice' => tx('Invoice', 'فاتورة'),
+      _ => k,
+    };
+
+/// Cost layer sources are built in the ledger in English ("Opening stock", "Purchase #3 · supplier").
+String _source(String s) {
+  if (!isAr) return s;
+  if (s == 'Opening stock') return 'رصيد افتتاحي';
+  for (final k in const ['Purchase', 'Issue', 'Invoice']) {
+    if (s.startsWith('$k #')) return _kind(k) + s.substring(k.length);
+  }
+  return s;
 }
 
 /// Opens the add/edit item form. [item] null means a new item.
@@ -123,11 +154,11 @@ class _ItemFormState extends State<_ItemForm> {
   Widget build(BuildContext context) {
     final isNew = widget.item == null;
     final units = {for (final i in widget.store.items) i.unit}.where((u) => u.isNotEmpty).toList()..sort();
-    String? numCheck(String? v) => parseNum(v ?? '') == null ? 'Enter a number' : null;
+    String? numCheck(String? v) => parseNum(v ?? '') == null ? tx('Enter a number', 'أدخل رقماً') : null;
     String? optNum(String? v) => (v ?? '').trim().isEmpty ? null : numCheck(v);
 
     return AlertDialog(
-      title: Text(isNew ? 'New item' : 'Edit item'),
+      title: Text(isNew ? tx('New item', 'مادة جديدة') : tx('Edit item', 'تعديل المادة')),
       content: SizedBox(
         width: 520,
         child: Form(
@@ -137,10 +168,10 @@ class _ItemFormState extends State<_ItemForm> {
               TextFormField(
                 controller: _id,
                 enabled: isNew,
-                decoration: const InputDecoration(labelText: 'Code'),
+                decoration: InputDecoration(labelText: tx('Code', 'الرمز')),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Enter a code';
-                  if (isNew && widget.store.item(v.trim()) != null) return 'This code is already used';
+                  if (v == null || v.trim().isEmpty) return tx('Enter a code', 'أدخل الرمز');
+                  if (isNew && widget.store.item(v.trim()) != null) return tx('This code is already used', 'هذا الرمز مستخدم');
                   return null;
                 },
               ),
@@ -150,10 +181,10 @@ class _ItemFormState extends State<_ItemForm> {
                   controller: _name,
                   autofocus: isNew,
                   textDirection: dirOf(_name.text),
-                  decoration: const InputDecoration(labelText: 'Name (Arabic is fine)'),
+                  decoration: InputDecoration(labelText: tx('Name (Arabic is fine)', 'الاسم')),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Enter a name';
-                    if (widget.store.nameTaken(v, exceptId: widget.item?.id)) return 'Another item has this name';
+                    if (v == null || v.trim().isEmpty) return tx('Enter a name', 'أدخل الاسم');
+                    if (widget.store.nameTaken(v, exceptId: widget.item?.id)) return tx('Another item has this name', 'توجد مادة أخرى بهذا الاسم');
                     return null;
                   },
                 ),
@@ -166,22 +197,22 @@ class _ItemFormState extends State<_ItemForm> {
                   controller: c,
                   focusNode: focus,
                   onChanged: (v) => _unit.text = v,
-                  decoration: const InputDecoration(labelText: 'Unit (e.g. قطعة, باكيت)'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a unit' : null,
+                  decoration: InputDecoration(labelText: tx('Unit (e.g. قطعة, باكيت)', 'الوحدة (مثل قطعة، باكيت)')),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? tx('Enter a unit', 'أدخل الوحدة') : null,
                 ),
               ),
               Row(children: [
                 Expanded(
                     child: TextFormField(
                         controller: _opening,
-                        decoration: const InputDecoration(labelText: 'Opening quantity'),
+                        decoration: InputDecoration(labelText: tx('Opening quantity', 'الكمية الافتتاحية')),
                         keyboardType: TextInputType.number,
                         validator: numCheck)),
                 const SizedBox(width: 16),
                 Expanded(
                     child: TextFormField(
                         controller: _min,
-                        decoration: const InputDecoration(labelText: 'Minimum level (warn below)'),
+                        decoration: InputDecoration(labelText: tx('Minimum level (warn below)', 'الحد الأدنى (تنبيه دونه)')),
                         keyboardType: TextInputType.number,
                         validator: numCheck)),
               ]),
@@ -189,22 +220,26 @@ class _ItemFormState extends State<_ItemForm> {
                 Expanded(
                     child: TextFormField(
                         controller: _sale,
-                        decoration: const InputDecoration(labelText: 'Usual selling price (IQD)', helperText: 'Suggested on invoices'),
+                        decoration: InputDecoration(
+                            labelText: tx('Usual selling price (IQD)', 'سعر البيع المعتاد (د.ع)'),
+                            helperText: tx('Suggested on invoices', 'يُقترح في الفواتير')),
                         keyboardType: TextInputType.number,
                         validator: optNum)),
                 const SizedBox(width: 16),
                 Expanded(
                     child: TextFormField(
                         controller: _openCost,
-                        decoration: const InputDecoration(labelText: 'Cost of each opening unit', helperText: 'Empty = first purchase price'),
+                        decoration: InputDecoration(
+                            labelText: tx('Cost of each opening unit', 'كلفة الوحدة الافتتاحية'),
+                            helperText: tx('Empty = first purchase price', 'فارغ = سعر أول شراء')),
                         keyboardType: TextInputType.number,
                         validator: optNum)),
               ]),
-              TextFormField(controller: _note, decoration: const InputDecoration(labelText: 'Note')),
+              TextFormField(controller: _note, decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'))),
               if (!isNew)
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Active (show in lists)'),
+                  title: Text(tx('Active (show in lists)', 'فعّالة (تظهر في القوائم)')),
                   value: _active,
                   onChanged: (v) => setState(() => _active = v),
                 ),
@@ -213,7 +248,7 @@ class _ItemFormState extends State<_ItemForm> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
         FilledButton(
           onPressed: () {
             if (!_form.currentState!.validate()) return;
@@ -232,7 +267,7 @@ class _ItemFormState extends State<_ItemForm> {
             ));
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(tx('Save', 'حفظ')),
         ),
       ],
     );

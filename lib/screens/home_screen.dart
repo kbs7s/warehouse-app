@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../insights.dart';
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -21,7 +22,7 @@ class HomeScreen extends StatelessWidget {
 
   static String get _greeting {
     final h = DateTime.now().hour;
-    return h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+    return h < 12 ? tx('Good morning', 'صباح الخير') : (h < 18 ? tx('Good afternoon', 'مساء الخير') : tx('Good evening', 'مساء الخير'));
   }
 
   @override
@@ -50,17 +51,17 @@ class HomeScreen extends StatelessWidget {
     final recent = s.receipts.reversed.take(5).toList();
 
     final reorderCard = _Panel(
-      title: 'Reorder now',
-      action: reorder.isEmpty ? null : ('See all', () => shell.go('Stock', 1)),
+      title: tx('Reorder now', 'إعادة الطلب الآن'),
+      action: reorder.isEmpty ? null : (tx('See all', 'عرض الكل'), () => shell.go('Stock', 1)),
       child: reorder.isEmpty
-          ? const _Empty(Icons.check_circle_outline, 'Everything is above its minimum level.')
+          ? _Empty(Icons.check_circle_outline, tx('Everything is above its minimum level.', 'كل المواد فوق الحد الأدنى.'))
           : Column(children: [for (final x in reorder.take(6)) _StockBar(store: s, x: x)]),
     );
     final recentCard = _Panel(
-      title: 'Latest issues',
-      action: ('See all', () => shell.go('Issue')),
+      title: tx('Latest issues', 'آخر الصرفيات'),
+      action: (tx('See all', 'عرض الكل'), () => shell.go('Issue')),
       child: recent.isEmpty
-          ? const _Empty(Icons.outbox_outlined, 'No supplies issued yet.')
+          ? _Empty(Icons.outbox_outlined, tx('No supplies issued yet.', 'لم يُصرف شيء بعد.'))
           : Column(children: [
               for (final r in recent)
                 ListTile(
@@ -70,8 +71,8 @@ class HomeScreen extends StatelessWidget {
                     backgroundColor: t.colorScheme.secondaryContainer,
                     child: Text('${r.no}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onSecondaryContainer)),
                   ),
-                  title: NameText(r.department ?? 'No department', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? 'item' : 'items'}'),
+                  title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}'),
                   trailing: const Icon(Icons.chevron_right),
                 ),
             ]),
@@ -88,38 +89,38 @@ class HomeScreen extends StatelessWidget {
             onPurchase: () => openPurchase(context, s, null),
             trailing: w < 700
                 ? [
-                    _HeroIcon(Icons.medical_services_outlined, 'Equipment', () => _push(context, EquipmentScreen(store: s))),
-                    _HeroIcon(Icons.settings_outlined, 'Settings & backup', () => _push(context, SettingsScreen(store: s))),
+                    _HeroIcon(Icons.medical_services_outlined, tx('Equipment', 'المعدات'), () => _push(context, EquipmentScreen(store: s))),
+                    _HeroIcon(Icons.settings_outlined, tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), () => _push(context, SettingsScreen(store: s))),
                   ]
                 : const [],
           ),
           const SizedBox(height: 16),
           TileGrid(children: [
             MetricTile(
-                label: 'Items in stock',
+                label: tx('Items in stock', 'مواد متوفرة'),
                 value: '${all.length - low - out}',
                 icon: Icons.inventory_2_outlined,
-                hint: 'of ${all.length} active items',
+                hint: tx('of ${all.length} active items', 'من ${all.length} مادة فعالة'),
                 onTap: () => shell.go('Stock')),
             MetricTile(
-                label: 'Running low',
+                label: tx('Running low', 'قاربت على النفاد'),
                 value: '$low',
                 icon: Icons.trending_down,
                 color: low > 0 ? AppColors.warn : null,
-                hint: 'At or under minimum',
+                hint: tx('At or under minimum', 'عند الحد الأدنى أو أقل'),
                 onTap: () => shell.go('Stock', 1)),
             MetricTile(
-                label: 'Out of stock',
+                label: tx('Out of stock', 'نفدت'),
                 value: '$out',
                 icon: Icons.remove_shopping_cart_outlined,
                 color: out > 0 ? AppColors.bad : null,
-                hint: 'Nothing left',
+                hint: tx('Nothing left', 'لم يبقَ شيء'),
                 onTap: () => shell.go('Stock', 1)),
             MetricTile(
-                label: 'Issued',
+                label: tx('Issued', 'صُرف'),
                 value: '${monthReceipts.length}',
                 icon: Icons.outbox_outlined,
-                hint: spendTotal > 0 ? 'This month · ${fmtMoneyShort(spendTotal)}' : 'Receipts this month',
+                hint: spendTotal > 0 ? tx('This month · ${fmtMoneyShort(spendTotal)}', 'هذا الشهر · ${fmtMoneyShort(spendTotal)}') : tx('Receipts this month', 'وصولات هذا الشهر'),
                 onTap: () => shell.go('Issue')),
           ]),
           const SizedBox(height: 16),
@@ -136,16 +137,16 @@ class HomeScreen extends StatelessWidget {
           ],
           const SizedBox(height: 16),
           _Panel(
-            title: 'Where supplies went this month',
+            title: tx('Where supplies went this month', 'أين ذهبت المواد هذا الشهر'),
             child: spend.isEmpty
-                ? const _Empty(Icons.pie_chart_outline, 'No issues with a known cost this month.')
+                ? _Empty(Icons.pie_chart_outline, tx('No issues with a known cost this month.', 'لا توجد صرفيات بكلفة معروفة هذا الشهر.'))
                 : Column(children: [
                     for (final e in (spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(6))
                       ShareBar(label: e.key, value: e.value, total: spendTotal, color: t.colorScheme.primary),
                   ]),
           ),
           if (insights.isNotEmpty) ...[
-            SectionTitle('Needs attention', trailing: Text('${insights.length}', style: t.textTheme.labelLarge)),
+            SectionTitle(tx('Needs attention', 'يحتاج انتباهك'), trailing: Text('${insights.length}', style: t.textTheme.labelLarge)),
             Card(
               clipBehavior: Clip.antiAlias,
               child: Column(children: [
@@ -156,26 +157,26 @@ class HomeScreen extends StatelessWidget {
               ]),
             ),
           ],
-          const SectionTitle('Supplies used, last 6 months'),
+          SectionTitle(tx('Supplies used, last 6 months', 'المواد المصروفة، آخر 6 أشهر')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: BarChart(
-                labels: [for (final m in months) names[m.month - 1]],
-                series: [(name: 'Cost of supplies issued', color: t.colorScheme.primary, values: used)],
+                labels: [for (final m in months) (isAr ? arMonthsShort : names)[m.month - 1]],
+                series: [(name: tx('Cost of supplies issued', 'كلفة المواد المصروفة'), color: t.colorScheme.primary, values: used)],
               ),
             ),
           ),
           if (s.invoices.isNotEmpty) ...[
-            const SectionTitle('Sales'),
+            SectionTitle(tx('Sales', 'المبيعات')),
             TileGrid(wideColumns: 2, children: [
               MetricTile(
-                  label: 'Clients owe you',
+                  label: tx('Clients owe you', 'ديون الزبائن لك'),
                   value: fmtMoneyShort(s.owedToUs),
                   icon: Icons.hourglass_bottom,
                   onTap: () => shell.go('Money', 1)),
               MetricTile(
-                  label: 'Sold this month',
+                  label: tx('Sold this month', 'مبيعات هذا الشهر'),
                   value: fmtMoneyShort(s.profit(from, to).sales),
                   icon: Icons.trending_up,
                   onTap: () => shell.go('Money', 1)),
@@ -203,7 +204,8 @@ Map<String, num> departmentSpend(WarehouseStore s, String from, String to) {
     for (final (i, _) in r.lines.indexed) {
       cost += s.ledger.lineCost['rcp:${r.no}:$i'] ?? 0;
     }
-    if (cost > 0) out[r.department ?? 'No department'] = (out[r.department ?? 'No department'] ?? 0) + cost;
+    final dep = r.department ?? tx('No department', 'بدون قسم');
+    if (cost > 0) out[dep] = (out[dep] ?? 0) + cost;
   }
   return out;
 }
@@ -220,17 +222,17 @@ class _Hero extends StatelessWidget {
     final phone = isPhone(context);
     final issue = FilledButton.icon(
       style: FilledButton.styleFrom(
-          backgroundColor: Colors.white, foregroundColor: AppColors.brand, minimumSize: const Size(0, 52), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          backgroundColor: Colors.white, foregroundColor: AppColors.brand, minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
       onPressed: onIssue,
       icon: const Icon(Icons.outbox_outlined),
-      label: const Text('Issue to department'),
+      label: Text(tx('Issue to department', 'صرف إلى قسم')),
     );
     final purchase = OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white, side: const BorderSide(color: Colors.white70), minimumSize: const Size(0, 52), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          foregroundColor: Colors.white, side: const BorderSide(color: Colors.white70), minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
       onPressed: onPurchase,
       icon: const Icon(Icons.add_shopping_cart),
-      label: const Text('Record purchase'),
+      label: Text(tx('Record purchase', 'تسجيل شراء')),
     );
     return Container(
       padding: EdgeInsets.all(phone ? 20 : 28),
@@ -345,7 +347,7 @@ class _StockBar extends StatelessWidget {
             Expanded(child: NameText(x.item.name, style: const TextStyle(fontWeight: FontWeight.w600))),
             Text('${fmtQty(x.qty)} ', style: TextStyle(fontWeight: FontWeight.w800, color: color)),
             NameText(x.item.unit, style: t.textTheme.bodySmall),
-            Text('  · min ${fmtQty(min)}', style: t.textTheme.bodySmall),
+            Text(tx('  · min ${fmtQty(min)}', '  · الأدنى ${fmtQty(min)}'), style: t.textTheme.bodySmall),
           ]),
           const SizedBox(height: 6),
           ClipRRect(

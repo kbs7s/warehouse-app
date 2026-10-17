@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -33,11 +34,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final cats = byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Expenses', 'المصاريف')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openExpense(context, s, null),
         icon: const Icon(Icons.add),
-        label: const Text('Add expense'),
+        label: Text(tx('Add expense', 'إضافة مصروف')),
       ),
       body: PageBody(children: [
         PeriodChips(value: _period, onChanged: (p) => setState(() => _period = p)),
@@ -46,20 +47,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Spent on running the business', style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+              Text(tx('Spent on running the business', 'المصروف على تشغيل العمل'), style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 4),
               Text(fmtMoney(total), style: t.textTheme.headlineSmall!.copyWith(fontWeight: FontWeight.w800)),
               if (cats.isNotEmpty) const SizedBox(height: 16),
-              for (final c in cats) ShareBar(label: c.key, value: c.value, total: total),
+              for (final c in cats) ShareBar(label: catLabel(c.key), value: c.value, total: total),
             ]),
           ),
         ),
-        SectionTitle('Entries', trailing: Text('${list.length}')),
+        SectionTitle(tx('Entries', 'القيود'), trailing: Text('${list.length}')),
         if (list.isEmpty)
-          const EmptyState(
+          EmptyState(
             icon: Icons.payments_outlined,
-            title: 'No expenses in this period',
-            message: 'Record rent, salaries, electricity and other running costs so profit is real.',
+            title: tx('No expenses in this period', 'لا توجد مصاريف في هذه الفترة'),
+            message: tx('Record rent, salaries, electricity and other running costs so profit is real.',
+                'سجّل الإيجار والرواتب والكهرباء وباقي مصاريف التشغيل حتى يكون الربح حقيقياً.'),
           )
         else
           Card(
@@ -72,7 +74,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   leading: CircleAvatar(
                       backgroundColor: t.colorScheme.tertiaryContainer,
                       child: Icon(categoryIcon(e.category), color: t.colorScheme.onTertiaryContainer, size: 20)),
-                  title: Text(e.category, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text(catLabel(e.category), style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text([fmtDate(e.date), ?e.note].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: Text(fmtMoney(e.amount), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
@@ -91,6 +93,17 @@ IconData categoryIcon(String c) => switch (c.toLowerCase()) {
       'transport' => Icons.local_shipping_outlined,
       'maintenance' => Icons.build_outlined,
       _ => Icons.sell_outlined,
+    };
+
+/// The six default categories are stored in English; show them in the interface language.
+String catLabel(String c) => switch (c) {
+      'Rent' => tx('Rent', 'إيجار'),
+      'Salaries' => tx('Salaries', 'رواتب'),
+      'Electricity' => tx('Electricity', 'كهرباء'),
+      'Transport' => tx('Transport', 'نقل'),
+      'Maintenance' => tx('Maintenance', 'صيانة'),
+      'Other' => tx('Other', 'أخرى'),
+      _ => c,
     };
 
 /// Period choice chips shared by the money screens.
@@ -168,7 +181,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   Widget build(BuildContext context) {
     final cats = widget.store.expenseCategories;
     return AlertDialog(
-      title: Text(widget.e == null ? 'Add expense' : 'Edit expense'),
+      title: Text(widget.e == null ? tx('Add expense', 'إضافة مصروف') : tx('Edit expense', 'تعديل المصروف')),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -177,18 +190,18 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               controller: _amount,
               autofocus: widget.e == null,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount (IQD)'),
+              decoration: InputDecoration(labelText: tx('Amount (IQD)', 'المبلغ (د.ع)')),
             ),
             const SizedBox(height: 12),
-            DatePickField(label: 'Date', value: _date, onChanged: (d) => setState(() => _date = d ?? _date)),
+            DatePickField(label: tx('Date', 'التاريخ'), value: _date, onChanged: (d) => setState(() => _date = d ?? _date)),
             const SizedBox(height: 14),
-            const Text('What was it for?'),
+            Text(tx('What was it for?', 'على ماذا صُرف؟')),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final c in cats)
                 ChoiceChip(
                   avatar: Icon(categoryIcon(c), size: 18),
-                  label: Text(c),
+                  label: Text(catLabel(c)),
                   selected: _cat == c,
                   showCheckmark: false,
                   onSelected: (_) => setState(() => _cat = c),
@@ -197,11 +210,11 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             const SizedBox(height: 10),
             TextField(
               controller: _newCat,
-              decoration: const InputDecoration(labelText: 'Or type a new category'),
+              decoration: InputDecoration(labelText: tx('Or type a new category', 'أو اكتب فئة جديدة')),
               onChanged: (v) => setState(() => _cat = v.trim().isEmpty ? (cats.first) : v.trim()),
             ),
             const SizedBox(height: 12),
-            TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note (optional)')),
+            TextField(controller: _note, decoration: InputDecoration(labelText: tx('Note (optional)', 'ملاحظة (اختياري)'))),
           ]),
         ),
       ),
@@ -209,18 +222,18 @@ class _ExpenseFormState extends State<_ExpenseForm> {
         if (widget.e != null)
           TextButton(
             onPressed: () async {
-              if (await confirm(context, 'Delete this expense?', '${fmtMoney(widget.e!.amount)} · ${widget.e!.category}')) {
+              if (await confirm(context, tx('Delete this expense?', 'حذف هذا المصروف؟'), '${fmtMoney(widget.e!.amount)} · ${catLabel(widget.e!.category)}')) {
                 widget.store.deleteExpense(widget.e!.id);
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.bad)),
+            child: Text(tx('Delete', 'حذف'), style: const TextStyle(color: AppColors.bad)),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
         FilledButton(
           onPressed: () {
             final a = parseNum(_amount.text);
-            if (a == null || a <= 0) return toast(context, 'Enter the amount.');
+            if (a == null || a <= 0) return toast(context, tx('Enter the amount.', 'أدخل المبلغ.'));
             final note = _note.text.trim();
             widget.store.saveExpense(Expense(
               id: widget.e?.id ?? widget.store.newId('e'),
@@ -231,7 +244,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             ));
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(tx('Save', 'حفظ')),
         ),
       ],
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../claude.dart';
 import '../insights.dart';
+import '../l10n.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -28,13 +29,21 @@ class _AssistantScreenState extends State<AssistantScreen> {
   bool _busy = false;
   String? _error;
 
-  static const _suggestions = [
-    'How did the business do this month?',
-    'Who should I chase for payment?',
-    'What should I reorder?',
-    'Where can I cut costs?',
-    'كم ربحنا هذا الشهر؟',
-  ];
+  static List<String> get _suggestions => isAr
+      ? const [
+          'كيف كان أداء العمل هذا الشهر؟',
+          'من يجب أن أطالبه بالدفع؟',
+          'ما الذي يجب أن أعيد طلبه؟',
+          'أين يمكنني تقليل المصاريف؟',
+          'أي قسم صرف أكثر هذا الشهر؟',
+        ]
+      : const [
+          'How did the business do this month?',
+          'Who should I chase for payment?',
+          'What should I reorder?',
+          'Where can I cut costs?',
+          'كم ربحنا هذا الشهر؟',
+        ];
 
   Future<void> _send(String text) async {
     final q = text.trim();
@@ -60,7 +69,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
     } catch (_) {
       _chat.removeLast();
       _input.text = q;
-      _error = 'Could not reach Claude. Check the internet connection. The insights on this page still work offline.';
+      _error = tx('Could not reach Claude. Check the internet connection. The insights on this page still work offline.',
+          'تعذّر الوصول إلى Claude. تحقق من الاتصال بالإنترنت. الملاحظات في هذه الصفحة تعمل بدون إنترنت.');
     }
     if (mounted) setState(() => _busy = false);
     _toBottom();
@@ -80,11 +90,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [Icon(Icons.auto_awesome, color: AppColors.brand), SizedBox(width: 10), Text('Assistant')]),
+        title: Row(children: [const Icon(Icons.auto_awesome, color: AppColors.brand), const SizedBox(width: 10), Text(tx('Assistant', 'المساعد'))]),
         actions: [
           if (_chat.isNotEmpty)
             TextButton.icon(
-                onPressed: () => setState(() => _chat.clear()), icon: const Icon(Icons.refresh), label: const Text('New chat')),
+                onPressed: () => setState(() => _chat.clear()), icon: const Icon(Icons.refresh), label: Text(tx('New chat', 'محادثة جديدة'))),
           const SizedBox(width: 8),
         ],
       ),
@@ -108,9 +118,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
           if (!hasKey)
             _KeyCard(store: widget.store)
           else if (_chat.isEmpty) ...[
-            Text('Ask anything about your business', style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
+            Text(tx('Ask anything about your business', 'اسأل أي شيء عن عملك'), style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('Claude reads your figures on this device and answers in English or Arabic.',
+            Text(tx('Claude reads your figures on this device and answers in English or Arabic.', 'يقرأ Claude أرقامك على هذا الجهاز ويجيب بالعربية أو الإنجليزية.'),
                 style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 12),
             Wrap(spacing: 8, runSpacing: 8, children: [
@@ -119,12 +129,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
           ],
           for (final m in _chat) _Bubble(user: m.user, text: m.text),
           if (_busy)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(children: [
-                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 10),
-                Text('Thinking…'),
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 10),
+                Text(tx('Thinking…', 'يفكر…')),
               ]),
             ),
           if (_error != null)
@@ -150,13 +160,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     maxLines: 4,
                     textInputAction: TextInputAction.send,
                     onSubmitted: _send,
-                    decoration: const InputDecoration(hintText: 'Ask about sales, stock, clients…'),
+                    decoration: InputDecoration(hintText: tx('Ask about sales, stock, clients…', 'اسأل عن المبيعات، المخزون، الزبائن…')),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton.filled(
-                tooltip: 'Send',
+                tooltip: tx('Send', 'إرسال'),
                 onPressed: _busy ? null : () => _send(_input.text),
                 icon: const Icon(Icons.arrow_upward),
               ),
@@ -174,15 +184,17 @@ class _InsightsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('What I noticed', style: Theme.of(context).textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
+        Text(tx('What I noticed', 'ما لاحظته'), style: Theme.of(context).textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        Text('Worked out on this device. No internet needed.', style: Theme.of(context).textTheme.bodySmall),
+        Text(tx('Worked out on this device. No internet needed.', 'محسوبة على هذا الجهاز. لا تحتاج إنترنت.'), style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 10),
         Card(
           clipBehavior: Clip.antiAlias,
           child: Column(children: [
             if (insights.isEmpty)
-              const ListTile(leading: Icon(Icons.check_circle, color: AppColors.good), title: Text('All good. Nothing needs you right now.')),
+              ListTile(
+                  leading: const Icon(Icons.check_circle, color: AppColors.good),
+                  title: Text(tx('All good. Nothing needs you right now.', 'كل شيء جيد. لا شيء يحتاجك الآن.'))),
             for (final (i, x) in insights.indexed) ...[
               if (i > 0) const Divider(height: 1),
               InsightTile(x, onTap: shell == null || x.target == null ? null : () => shell!.goInsight(x.target!)),
@@ -242,23 +254,26 @@ class _KeyCardState extends State<_KeyCard> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Turn on chat with Claude', style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
+          Text(tx('Turn on chat with Claude', 'فعّل المحادثة مع Claude'), style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
-          const Text('Paste an Anthropic API key (from console.anthropic.com). It is stored only on this device and never goes '
-              'into backup files. When you ask a question, a summary of your figures is sent to Claude to answer it.'),
+          Text(tx(
+              'Paste an Anthropic API key (from console.anthropic.com). It is stored only on this device and never goes '
+                  'into backup files. When you ask a question, a summary of your figures is sent to Claude to answer it.',
+              'الصق مفتاح Anthropic API (من console.anthropic.com). يُحفظ على هذا الجهاز فقط ولا يدخل '
+                  'في ملفات النسخ الاحتياطي. عندما تسأل، يُرسل ملخص لأرقامك إلى Claude ليجيب.')),
           const SizedBox(height: 14),
           TextField(
             controller: _key,
             obscureText: true,
-            decoration: const InputDecoration(labelText: 'API key', hintText: 'sk-ant-…'),
+            decoration: InputDecoration(labelText: tx('API key', 'مفتاح API'), hintText: 'sk-ant-…'),
           ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: () {
-              if (!_key.text.trim().startsWith('sk-')) return toast(context, 'That does not look like an API key.');
+              if (!_key.text.trim().startsWith('sk-')) return toast(context, tx('That does not look like an API key.', 'هذا لا يبدو مفتاح API.'));
               widget.store.setApiKey(_key.text);
             },
-            child: const Text('Save key'),
+            child: Text(tx('Save key', 'حفظ المفتاح')),
           ),
         ]),
       ),

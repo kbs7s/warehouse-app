@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -31,26 +32,26 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     num sum(num Function(Payment) f) => all.fold<num>(0, (s, p) => s + f(p));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Supplier payments'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Supplier payments', 'فواتير المجهزين')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),
-        label: const Text('New invoice'),
+        label: Text(tx('New invoice', 'فاتورة جديدة')),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 12, runSpacing: 12, children: [
-            _Total('Total', sum((p) => p.amount)),
-            _Total('Paid', sum((p) => p.paid), color: Colors.green),
-            _Total('Still owed', sum((p) => p.remaining), color: Colors.red),
+            _Total(tx('Total', 'المجموع'), sum((p) => p.amount)),
+            _Total(tx('Paid', 'المدفوع'), sum((p) => p.paid), color: Colors.green),
+            _Total(tx('Still owed', 'المتبقي'), sum((p) => p.remaining), color: Colors.red),
           ]),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: SearchField(onChanged: (v) => setState(() => _q = v), hint: 'Supplier or details')),
+            Expanded(child: SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Supplier or details', 'المجهز أو التفاصيل'))),
             const SizedBox(width: 12),
             FilterChip(
-                label: const Text('Unpaid only'),
+                label: Text(tx('Unpaid only', 'غير المسددة فقط')),
                 selected: _unpaidOnly,
                 onSelected: (v) => setState(() => _unpaidOnly = v)),
           ]),
@@ -78,7 +79,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(fmtQty(p.amount), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                        Text(p.settled ? 'Paid' : 'Owed ${fmtQty(p.remaining)}',
+                        Text(p.settled ? tx('Paid', 'مسددة') : tx('Owed ${fmtQty(p.remaining)}', 'متبقي ${fmtQty(p.remaining)}'),
                             style: TextStyle(color: p.settled ? Colors.green : Colors.red)),
                       ]),
                 );
@@ -133,11 +134,11 @@ class _PaymentFormState extends State<_PaymentForm> {
   Widget build(BuildContext context) {
     final e = widget.existing;
     return AlertDialog(
-      title: Text(e == null ? 'New supplier invoice' : 'Invoice #${e.no}'),
+      title: Text(e == null ? tx('New supplier invoice', 'فاتورة مجهز جديدة') : tx('Invoice #${e.no}', 'فاتورة رقم ${e.no}')),
       content: SizedBox(
         width: 520,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          SuggestField(label: 'Supplier', controller: _supplier, options: widget.store.suppliers),
+          SuggestField(label: tx('Supplier', 'المجهز'), controller: _supplier, options: widget.store.suppliers),
           const SizedBox(height: 12),
           InkWell(
             onTap: () async {
@@ -148,7 +149,7 @@ class _PaymentFormState extends State<_PaymentForm> {
                   lastDate: DateTime(2100));
               if (d != null) setState(() => _date = isoDate(d));
             },
-            child: InputDecorator(decoration: const InputDecoration(labelText: 'Date'), child: Text(fmtDate(_date))),
+            child: InputDecorator(decoration: InputDecoration(labelText: tx('Date', 'التاريخ')), child: Text(fmtDate(_date))),
           ),
           const SizedBox(height: 12),
           Row(children: [
@@ -156,15 +157,15 @@ class _PaymentFormState extends State<_PaymentForm> {
                 child: TextField(
                     controller: _amount,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Amount'))),
+                    decoration: InputDecoration(labelText: tx('Amount', 'المبلغ')))),
             const SizedBox(width: 12),
             Expanded(
                 child: TextField(
                     controller: _paid,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Paid so far'))),
+                    decoration: InputDecoration(labelText: tx('Paid so far', 'المدفوع حتى الآن')))),
             const SizedBox(width: 8),
-            TextButton(onPressed: () => _paid.text = _amount.text, child: const Text('Paid in full')),
+            TextButton(onPressed: () => _paid.text = _amount.text, child: Text(tx('Paid in full', 'مدفوعة بالكامل'))),
           ]),
           const SizedBox(height: 12),
           ListenableBuilder(
@@ -173,7 +174,7 @@ class _PaymentFormState extends State<_PaymentForm> {
                 controller: _details,
                 maxLines: 3,
                 textDirection: dirOf(_details.text),
-                decoration: const InputDecoration(labelText: 'Details')),
+                decoration: InputDecoration(labelText: tx('Details', 'التفاصيل'))),
           ),
         ]),
       ),
@@ -181,19 +182,19 @@ class _PaymentFormState extends State<_PaymentForm> {
         if (e != null)
           TextButton(
             onPressed: () async {
-              if (await confirm(context, 'Delete invoice #${e.no}?', 'This cannot be undone.')) {
+              if (await confirm(context, tx('Delete invoice #${e.no}?', 'حذف الفاتورة رقم ${e.no}؟'), tx('This cannot be undone.', 'لا يمكن التراجع عن هذا.'))) {
                 widget.store.deletePayment(e.no);
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: const Text('Delete'),
+            child: Text(tx('Delete', 'حذف')),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
         FilledButton(
           onPressed: () {
             final amount = parseNum(_amount.text), paid = parseNum(_paid.text.isEmpty ? '0' : _paid.text);
             if (_supplier.text.trim().isEmpty || amount == null || paid == null) {
-              return toast(context, 'Enter the supplier, amount and paid amount.');
+              return toast(context, tx('Enter the supplier, amount and paid amount.', 'أدخل المجهز والمبلغ والمدفوع.'));
             }
             final details = _details.text.trim();
             widget.store.savePayment(
@@ -207,7 +208,7 @@ class _PaymentFormState extends State<_PaymentForm> {
                 replacingNo: e?.no);
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(tx('Save', 'حفظ')),
         ),
       ],
     );

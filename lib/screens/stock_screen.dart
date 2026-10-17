@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -30,29 +31,29 @@ class _StockScreenState extends State<StockScreen> {
     int count(StockStatus st) => all.where((s) => s.status == st).length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stock'), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Stock', 'المخزون')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => editItem(context, store, null),
         icon: const Icon(Icons.add),
-        label: const Text('New item'),
+        label: Text(tx('New item', 'مادة جديدة')),
       ),
       body: CardList(
-        empty: 'No items match.',
+        empty: tx('No items match.', 'لا توجد مواد مطابقة.'),
         header: [
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _FilterChip('All items', all.length, _filter == null, () => setState(() => _filter = null)),
+              _FilterChip(tx('All items', 'كل المواد'), all.length, _filter == null, () => setState(() => _filter = null)),
               _FilterChip(
-                'Low',
+                tx('Low', 'منخفض'),
                 count(StockStatus.low),
                 _filter == StockStatus.low,
                 () => setState(() => _filter = StockStatus.low),
                 color: Colors.orange,
               ),
               _FilterChip(
-                'Out',
+                tx('Out', 'نفد'),
                 count(StockStatus.out),
                 _filter == StockStatus.out,
                 () => setState(() => _filter = StockStatus.out),
@@ -61,7 +62,7 @@ class _StockScreenState extends State<StockScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          SearchField(onChanged: (v) => setState(() => _query = v), hint: 'Search by name or code'),
+          SearchField(onChanged: (v) => setState(() => _query = v), hint: tx('Search by name or code', 'ابحث بالاسم أو الرمز')),
         ],
         itemCount: rows.isEmpty ? 0 : rows.length + 1,
         itemBuilder: (_, i) => i == 0
@@ -116,26 +117,26 @@ class _HeaderRow extends StatelessWidget {
           if (!phone)
             SizedBox(
               width: _cols[0],
-              child: Text('Code', style: s),
+              child: Text(tx('Code', 'الرمز'), style: s),
             ),
-          Expanded(child: Text('Item', style: s)),
+          Expanded(child: Text(tx('Item', 'المادة'), style: s)),
           if (!phone)
             SizedBox(
               width: _cols[2],
-              child: Text('Unit', style: s),
+              child: Text(tx('Unit', 'الوحدة'), style: s),
             ),
           SizedBox(
             width: _cols[3],
-            child: Text('In stock', style: s, textAlign: TextAlign.end),
+            child: Text(tx('In stock', 'الموجود'), style: s, textAlign: TextAlign.end),
           ),
           if (!phone)
             SizedBox(
               width: _cols[4],
-              child: Text('Min', style: s, textAlign: TextAlign.end),
+              child: Text(tx('Min', 'الحد الأدنى'), style: s, textAlign: TextAlign.end),
             ),
           SizedBox(
             width: _cols[5],
-            child: Text('Status', style: s, textAlign: TextAlign.center),
+            child: Text(tx('Status', 'الحالة'), style: s, textAlign: TextAlign.center),
           ),
         ],
       ),
