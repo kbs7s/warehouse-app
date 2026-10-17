@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
+import 'l10n.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -8,11 +9,13 @@ final _qtyFmt = intl.NumberFormat('#,##0.##', 'en');
 final _moneyFmt = intl.NumberFormat('#,##0', 'en');
 
 String fmtQty(num q) => _qtyFmt.format(q);
-String fmtMoney(num m) => '${_moneyFmt.format(m == 0 ? 0 : m)} IQD'; // never "-0"
+String get currency => tx('IQD', 'د.ع');
+String fmtMoney(num m) => '${_moneyFmt.format(m == 0 ? 0 : m)} $currency'; // never "-0"
 String fmtDate(String? iso) {
   if (iso == null) return '—';
   final d = DateTime.tryParse(iso);
-  return d == null ? iso : intl.DateFormat('d MMM yyyy').format(d);
+  if (d == null) return iso;
+  return isAr ? '${d.day} ${arMonths[d.month - 1]} ${d.year}' : intl.DateFormat('d MMM yyyy').format(d);
 }
 
 String isoDate(DateTime d) => intl.DateFormat('yyyy-MM-dd').format(d);
@@ -24,16 +27,21 @@ TextDirection dirOf(String s) =>
 
 /// Text that picks its own direction, for user-entered names.
 class NameText extends StatelessWidget {
-  const NameText(this.text, {super.key, this.style, this.maxLines = 1, this.textAlign = TextAlign.left});
+  const NameText(this.text, {super.key, this.style, this.maxLines = 1, this.textAlign});
   final String text;
   final TextStyle? style;
   final int? maxLines;
-  // Left by default so Arabic names line up with English ones in the English layout.
-  final TextAlign textAlign;
+  final TextAlign? textAlign;
 
+  // Aligned to the start of the interface (left in English, right in Arabic) whatever the name's
+  // own direction, so mixed Arabic and English names line up.
   @override
   Widget build(BuildContext context) => Text(text,
-      textDirection: dirOf(text), textAlign: textAlign, style: style, maxLines: maxLines, overflow: TextOverflow.ellipsis);
+      textDirection: dirOf(text),
+      textAlign: textAlign ?? (Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left),
+      style: style,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis);
 }
 
 class StatusChip extends StatelessWidget {
@@ -101,10 +109,11 @@ num? parseNum(String s) {
 String fmtMoneyShort(num m) {
   final a = m.abs();
   final sign = m < 0 ? '−' : '';
-  if (a >= 1e9) return '$sign${(a / 1e9).toStringAsFixed(2)}B IQD';
-  if (a >= 1e6) return '$sign${(a / 1e6).toStringAsFixed(a >= 1e8 ? 0 : 2)}M IQD';
-  if (a >= 1e4) return '$sign${(a / 1e3).toStringAsFixed(0)}K IQD';
-  return '$sign${_moneyFmt.format(a)} IQD';
+  final c = currency;
+  if (a >= 1e9) return '$sign${(a / 1e9).toStringAsFixed(2)}${tx('B', ' مليار')} $c';
+  if (a >= 1e6) return '$sign${(a / 1e6).toStringAsFixed(a >= 1e8 ? 0 : 2)}${tx('M', ' مليون')} $c';
+  if (a >= 1e4) return '$sign${(a / 1e3).toStringAsFixed(0)}${tx('K', ' ألف')} $c';
+  return '$sign${_moneyFmt.format(a)} $c';
 }
 
 bool isPhone(BuildContext context) => MediaQuery.sizeOf(context).width < 640;
@@ -114,10 +123,10 @@ enum Period { thisMonth, lastMonth, thisYear, allTime }
 
 extension PeriodX on Period {
   String get label => switch (this) {
-        Period.thisMonth => 'This month',
-        Period.lastMonth => 'Last month',
-        Period.thisYear => 'This year',
-        Period.allTime => 'All time',
+        Period.thisMonth => tx('This month', 'هذا الشهر'),
+        Period.lastMonth => tx('Last month', 'الشهر الماضي'),
+        Period.thisYear => tx('This year', 'هذه السنة'),
+        Period.allTime => tx('All time', 'كل الوقت'),
       };
 
   (String, String) range([DateTime? now]) {

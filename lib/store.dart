@@ -35,6 +35,7 @@ class WarehouseStore extends ChangeNotifier {
   String? source;
   String? lastBackupAt; // when a backup file was last exported
   String apiKey = ''; // Claude API key, stored only on this device
+  String lang = 'en'; // interface language on this device: 'en' or 'ar'
 
   Map<String, StockInfo> _stock = {};
   Ledger ledger = Ledger.build(items: [], purchases: [], receipts: [], invoices: []);
@@ -56,12 +57,25 @@ class WarehouseStore extends ChangeNotifier {
       if (old != null) applyJson(jsonDecode(old) as Map<String, dynamic>);
     }
     final device = _db == null ? null : await _deviceRecord.get(_db);
-    if (device != null) apiKey = ((jsonDecode(device) as Map<String, dynamic>)['apiKey'] as String?) ?? '';
+    if (device != null) {
+      final j = jsonDecode(device) as Map<String, dynamic>;
+      apiKey = (j['apiKey'] as String?) ?? '';
+      lang = (j['lang'] as String?) ?? 'en';
+    }
   }
 
   Future<void> setApiKey(String key) async {
     apiKey = key.trim();
-    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'apiKey': apiKey}));
+    await _saveDevice();
+  }
+
+  Future<void> setLang(String code) async {
+    lang = code;
+    await _saveDevice();
+  }
+
+  Future<void> _saveDevice() async {
+    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'apiKey': apiKey, 'lang': lang}));
     notifyListeners();
   }
 

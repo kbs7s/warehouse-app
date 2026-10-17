@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sembast_web/sembast_web.dart';
 
+import 'l10n.dart';
 import 'platform/files.dart';
 import 'screens/welcome_screen.dart';
 import 'shell.dart';
@@ -28,14 +30,24 @@ class BusinessApp extends StatelessWidget {
   final WarehouseStore store;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'Business',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(Brightness.light),
-        darkTheme: buildTheme(Brightness.dark),
-        home: ListenableBuilder(
-          listenable: store,
-          builder: (_, _) => store.started ? HomeShell(store: store) : WelcomeScreen(store: store),
-        ),
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: store,
+        builder: (_, _) {
+          isAr = store.lang == 'ar';
+          return MaterialApp(
+            title: 'Business',
+            debugShowCheckedModeBanner: false,
+            theme: buildTheme(Brightness.light),
+            darkTheme: buildTheme(Brightness.dark),
+            // Arabic turns the whole layout right-to-left; Western digits are kept in both languages.
+            locale: Locale(store.lang),
+            supportedLocales: const [Locale('en'), Locale('ar')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            home: KeyedSubtree(
+              key: ValueKey(store.lang),
+              child: store.started ? HomeShell(store: store) : WelcomeScreen(store: store),
+            ),
+          );
+        },
       );
 }
