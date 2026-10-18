@@ -19,11 +19,12 @@ class CloudConfig {
 
   bool get isSet => projectId.isNotEmpty && apiKey.isNotEmpty;
 
-  /// The shared store's Firebase project, set at build time (see .github/workflows/pages.yml).
-  /// Without it, each device enters the two values on the sign-in screen.
+  /// The shared store's Firebase project (hospital-store-a4ce1). A build can point elsewhere with
+  /// --dart-define FIREBASE_PROJECT / FIREBASE_API_KEY.
   static const builtIn = CloudConfig(
-    projectId: String.fromEnvironment('FIREBASE_PROJECT'),
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT', defaultValue: 'hospital-store-a4ce1'),
+    // A Firebase web key only names the project; the Firestore rules decide who can read the data.
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: 'AIzaSyAsPVtmHL5pmRUL_ksZdyayZLz_jEs4_5A'),
     emulatorHost: bool.hasEnvironment('FIREBASE_EMULATOR') ? String.fromEnvironment('FIREBASE_EMULATOR') : null,
   );
 

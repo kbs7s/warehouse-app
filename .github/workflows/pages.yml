@@ -25,8 +25,7 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: flutter analyze
-      # The shared store's Firebase project (repository variables; empty means each device enters it).
-      - run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/" --dart-define=FIREBASE_PROJECT=${{ vars.FIREBASE_PROJECT }} --dart-define=FIREBASE_API_KEY=${{ vars.FIREBASE_API_KEY }}
+      - run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
       - run: python3 tool/make_sw.py
       - uses: actions/upload-pages-artifact@v3
         with:
