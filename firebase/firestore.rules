@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Rules for the hospital store's shared data. Paste into Firebase console → Firestore → Rules.
+// Only people in the "members" list can read or change the data; only an owner can change the list.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email != null; }
+    function memberDoc() { return /databases/$(db)/documents/members/$(request.auth.token.email); }
+    function isMember() { return signedIn() && exists(memberDoc()); }
+    function isOwner() { return isMember() && get(memberDoc()).data.role == 'owner'; }
+
+    match /stores/{store} {
+      allow read, write: if isMember();
+    }
+
+    match /members/{email} {
+      allow read: if isMember();
+      allow write: if isOwner();
+      // First-time setup: the person who sets up the store becomes its owner. Closed for good
+      // once the shared data exists.
+      allow create: if signedIn() && email == request.auth.token.email
+                    && request.resource.data.role == 'owner'
+                    && !exists(/databases/$(db)/documents/stores/main);
+    }
+  }
+}

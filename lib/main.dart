@@ -7,6 +7,7 @@ import 'platform/files.dart';
 import 'screens/welcome_screen.dart';
 import 'shell.dart';
 import 'store.dart';
+import 'sync.dart';
 import 'theme.dart';
 
 export 'shell.dart' show HomeShell;
@@ -21,6 +22,7 @@ Future<void> main() async {
   final legacy = await databaseFactoryWeb.openDatabase('warehouse');
   await store.load(legacy: legacy);
   await legacy.close();
+  await CloudSync(store, db).load();
   requestPersistentStorage();
   runApp(BusinessApp(store: store));
 }

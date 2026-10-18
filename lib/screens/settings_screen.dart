@@ -8,6 +8,7 @@ import '../platform/files.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
+import 'cloud_screens.dart';
 import 'welcome_screen.dart' show LanguageChips;
 
 class SettingsScreen extends StatelessWidget {
@@ -46,7 +47,12 @@ class SettingsScreen extends StatelessWidget {
         action: tx('Erase', 'مسح'))) {
       return;
     }
-    await store.eraseAll();
+    final cloud = store.cloud;
+    if (cloud != null && cloud.signedIn) {
+      await cloud.signOut(); // the shared copy stays online for the team
+    } else {
+      await store.eraseAll();
+    }
   }
 
   @override
@@ -65,6 +71,8 @@ class SettingsScreen extends StatelessWidget {
             ]),
           ),
         ),
+        const SizedBox(height: 12),
+        CloudCard(store: store),
         const SizedBox(height: 12),
         _BusinessCard(store: store),
         const SizedBox(height: 12),
@@ -89,13 +97,16 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(tx('Backup', 'النسخ الاحتياطي'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
+              if (store.cloud?.signedIn ?? false)
+                Text(tx('Your data is shared online and saved on this device. A backup file each month is still a good idea.',
+                    'بياناتك مشتركة أونلاين ومحفوظة على هذا الجهاز. يبقى من الجيد تصدير نسخة احتياطية كل شهر.'))
+              else
               Text(tx(
                   'Your data is saved only on this device. Export a backup at least once a week and keep it in '
                       'Files or iCloud Drive, so nothing is lost if Safari data is cleared.',

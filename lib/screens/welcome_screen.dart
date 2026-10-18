@@ -6,6 +6,7 @@ import '../l10n.dart';
 import '../platform/files.dart';
 import '../store.dart';
 import '../ui.dart';
+import 'cloud_screens.dart';
 
 /// First screen on a new iPad: load the data file (Excel import or a backup), or start empty.
 class WelcomeScreen extends StatelessWidget {
@@ -91,6 +92,12 @@ class WelcomeScreen extends StatelessWidget {
                     onPressed: () => _load(context),
                     icon: const Icon(Icons.upload_file),
                     label: Text(tx('Load data file or backup', 'تحميل ملف بيانات أو نسخة احتياطية')),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CloudSignInScreen(store: store))),
+                    icon: const Icon(Icons.cloud_outlined),
+                    label: Text(tx('Sign in to the shared store', 'تسجيل الدخول إلى المخزن المشترك')),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton(onPressed: store.startEmpty, child: Text(tx('Start fresh', 'ابدأ من جديد'))),

@@ -16,6 +16,7 @@ import 'item_screens.dart';
 import 'purchase_screens.dart';
 import 'receipt_screens.dart';
 import 'reports_screen.dart' show reorderList;
+import 'cloud_screens.dart';
 import 'settings_screen.dart';
 
 /// The store's day at a glance: issue supplies, what is running low, where supplies went.
@@ -123,12 +124,13 @@ class HomeScreen extends StatelessWidget {
             name: s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,
             onIssue: () => openReceipt(context, s, null),
             onPurchase: () => openPurchase(context, s, null),
-            trailing: w < 700
-                ? [
+            trailing: [
+              SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
+              if (w < 700) ...[
                     _HeroIcon(Icons.medical_services_outlined, tx('Equipment', 'المعدات'), () => _push(context, EquipmentScreen(store: s))),
                     _HeroIcon(Icons.settings_outlined, tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), () => _push(context, SettingsScreen(store: s))),
-                  ]
-                : const [],
+              ],
+            ],
           ),
           const SizedBox(height: 16),
           TileGrid(children: [

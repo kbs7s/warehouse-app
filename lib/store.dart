@@ -6,6 +6,7 @@ import 'package:sembast/sembast.dart';
 import 'ledger.dart';
 import 'models.dart';
 import 'month.dart';
+import 'sync.dart';
 
 /// Holds all warehouse data in memory and saves it to the device after every change.
 ///
@@ -46,6 +47,12 @@ class WarehouseStore extends ChangeNotifier {
   /// True once data has been loaded from a file or the user chose to start empty.
   bool started = false;
 
+  /// Called after every saved change (the online sync uses it to send the change).
+  VoidCallback? onLocalSave;
+
+  /// Online sharing for this device; set by CloudSync.
+  CloudSync? cloud;
+
   /// Loads the data saved on this device, if any. The Excel data is not bundled with the app
   /// (it contains staff names and phone numbers); it is loaded once from a file instead.
   ///
@@ -75,6 +82,9 @@ class WarehouseStore extends ChangeNotifier {
     if (_db != null) await _deviceRecord.put(_db, jsonEncode({'lang': lang}));
     notifyListeners();
   }
+
+  /// Redraws screens that depend on the online sign-in.
+  void refresh() => notifyListeners();
 
   void startEmpty() => applyJson({'format': 'warehouse-backup', 'version': 1, 'source': 'Started empty'});
 
@@ -181,6 +191,7 @@ class WarehouseStore extends ChangeNotifier {
     ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
+    if (save) onLocalSave?.call();
   }
 
   /// Adds an expiry date to an item, or replaces [replacing] with it; null [batch] removes [replacing].
