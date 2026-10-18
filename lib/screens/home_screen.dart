@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../expiry.dart';
 import '../insights.dart';
 import '../l10n.dart';
 import '../models.dart';
@@ -9,6 +10,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
 import 'equipment_screen.dart';
+import 'expiry_screens.dart';
 import 'expense_screens.dart' show ShareBar;
 import 'item_screens.dart';
 import 'purchase_screens.dart';
@@ -58,6 +60,38 @@ class HomeScreen extends StatelessWidget {
       child: reorder.isEmpty
           ? _Empty(Icons.check_circle_outline, tx('Everything is above its minimum level.', 'كل المواد فوق الحد الأدنى.'))
           : Column(children: [for (final x in reorder.take(6)) _StockBar(store: s, x: x)]),
+    );
+    final expiring = s.expiryAlerts;
+    final hasDates = s.items.any((i) => i.expiries.isNotEmpty);
+    final expiryCard = _Panel(
+      title: tx('Expiring soon', 'قريبة الانتهاء'),
+      action: (hasDates ? tx('See all', 'عرض الكل') : tx('Add dates', 'إضافة تواريخ'), () => shell.go('Stock', 2)),
+      child: expiring.isEmpty
+          ? _Empty(
+              Icons.event_available,
+              hasDates
+                  ? tx('Nothing expires within ${s.expiryWarnDays} days.', 'لا شيء ينتهي خلال ${s.expiryWarnDays} يوماً.')
+                  : tx('Add expiry dates to items to get a warning before they expire.', 'أضف تواريخ الانتهاء للمواد ليصلك تنبيه قبل انتهائها.'))
+          : Column(children: [
+              for (final e in expiring.take(5))
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ItemDetailScreen(store: s, itemId: e.item.id))),
+                  title: NameText(e.item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(batchLine(e.batch, e.item.unit)),
+                  trailing: ExpiryChip(e),
+                ),
+            ]),
+    );
+    final whereCard = _Panel(
+      title: tx('Where supplies went this month', 'أين ذهبت المواد هذا الشهر'),
+      child: spend.isEmpty
+          ? _Empty(Icons.pie_chart_outline, tx('No issues with a known cost this month.', 'لا توجد صرفيات بكلفة معروفة هذا الشهر.'))
+          : Column(children: [
+              for (final e in (spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(6))
+                ShareBar(label: e.key, value: e.value, total: spendTotal, color: t.colorScheme.primary),
+            ]),
     );
     final recentCard = _Panel(
       title: tx('Latest issues', 'آخر الصرفيات'),
@@ -138,15 +172,17 @@ class HomeScreen extends StatelessWidget {
             recentCard,
           ],
           const SizedBox(height: 16),
-          _Panel(
-            title: tx('Where supplies went this month', 'أين ذهبت المواد هذا الشهر'),
-            child: spend.isEmpty
-                ? _Empty(Icons.pie_chart_outline, tx('No issues with a known cost this month.', 'لا توجد صرفيات بكلفة معروفة هذا الشهر.'))
-                : Column(children: [
-                    for (final e in (spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(6))
-                      ShareBar(label: e.key, value: e.value, total: spendTotal, color: t.colorScheme.primary),
-                  ]),
-          ),
+          if (wide)
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: expiryCard),
+              const SizedBox(width: 16),
+              Expanded(child: whereCard),
+            ])
+          else ...[
+            expiryCard,
+            const SizedBox(height: 16),
+            whereCard,
+          ],
           if (insights.isNotEmpty) ...[
             SectionTitle(tx('Needs attention', 'يحتاج انتباهك'), trailing: Text('${insights.length}', style: t.textTheme.labelLarge)),
             Card(

@@ -1,3 +1,4 @@
+import 'expiry.dart';
 import 'l10n.dart';
 import 'models.dart';
 import 'platform/files.dart';
@@ -82,6 +83,13 @@ List<Sheet> workbookSheets(WarehouseStore s, DateTime now) {
     ], [
       for (final e in s.equipment)
         [e.name, e.dateReceived, e.startQty, e.boughtQty, e.usedQty, e.nowQty, e.usageDates.join(', ')],
+    ]),
+    Sheet(tx('Expiry dates', 'تواريخ الانتهاء'), [
+      for (final (en, ar) in [('Code', 'الرمز'), ('Item', 'المادة'), ('Unit', 'الوحدة'), ('Expiry date', 'تاريخ الانتهاء'), ('Quantity', 'الكمية'),
+        ('Lot', 'التشغيلة'), ('Days left', 'الأيام المتبقية'), ('In stock now', 'الموجود الآن')]) tx(en, ar),
+    ], [
+      for (final e in s.expiryList(all: true))
+        [e.item.id, e.item.name, e.item.unit, e.batch.date, e.batch.qty, e.batch.lot, e.daysLeft, s.stock(e.item.id).qty],
     ]),
   ];
   // Arabic workbooks open right to left, like the old Excel file.

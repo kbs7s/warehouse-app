@@ -15,7 +15,8 @@ class Item {
     this.note,
     this.salePrice,
     this.openingUnitCost,
-  });
+    List<ExpiryBatch>? expiries,
+  }) : expiries = expiries ?? [];
 
   final String id;
   String name;
@@ -27,6 +28,7 @@ class Item {
   String? note;
   num? salePrice; // usual selling price, suggested on invoices (IQD)
   num? openingUnitCost; // cost of each unit of opening stock; null = use the first purchase price
+  List<ExpiryBatch> expiries; // expiry dates of the stock on hand, entered by hand
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         id: j['id'] as String,
@@ -39,6 +41,7 @@ class Item {
         note: j['note'] as String?,
         salePrice: j['salePrice'] as num?,
         openingUnitCost: j['openingUnitCost'] as num?,
+        expiries: [for (final e in (j['expiries'] as List? ?? [])) ExpiryBatch.fromJson(e as Map<String, dynamic>)],
       );
 
   Map<String, dynamic> toJson() => {
@@ -52,7 +55,20 @@ class Item {
         'note': note,
         'salePrice': salePrice,
         'openingUnitCost': openingUnitCost,
+        if (expiries.isNotEmpty) 'expiries': [for (final e in expiries) e.toJson()],
       };
+}
+
+/// Part of an item's stock that expires on one date: how many (if known) and the lot number.
+class ExpiryBatch {
+  ExpiryBatch({required this.date, this.qty, this.lot});
+  String date; // yyyy-MM-dd
+  num? qty;
+  String? lot;
+
+  factory ExpiryBatch.fromJson(Map<String, dynamic> j) =>
+      ExpiryBatch(date: j['date'] as String, qty: j['qty'] as num?, lot: j['lot'] as String?);
+  Map<String, dynamic> toJson() => {'date': date, if (qty != null) 'qty': qty, if (lot != null) 'lot': lot};
 }
 
 class Customer {

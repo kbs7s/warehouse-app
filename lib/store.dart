@@ -33,6 +33,7 @@ class WarehouseStore extends ChangeNotifier {
   List<Invoice> invoices = [];
   List<Expense> expenses = [];
   List<MonthClose> monthCloses = []; // saved month ends, oldest first
+  int expiryWarnDays = 90; // alert this many days before an expiry date
   String? monthStart; // start of the open month when set by hand (see openMonthStart)
   String companyName = '';
   String? source;
@@ -97,6 +98,7 @@ class WarehouseStore extends ChangeNotifier {
     expenses = [];
     monthCloses = [];
     monthStart = null;
+    expiryWarnDays = 90;
     companyName = '';
     source = null;
     lastBackupAt = null;
@@ -124,6 +126,7 @@ class WarehouseStore extends ChangeNotifier {
     expenses = list('expenses').map(Expense.fromJson).toList();
     monthCloses = list('monthCloses').map(MonthClose.fromJson).toList();
     monthStart = j['monthStart'] as String?;
+    expiryWarnDays = (j['expiryWarnDays'] as num?)?.toInt() ?? 90;
     companyName = (j['companyName'] as String?) ?? '';
     source = j['source'] as String?;
     lastBackupAt = j['lastBackupAt'] as String?;
@@ -152,6 +155,7 @@ class WarehouseStore extends ChangeNotifier {
         'expenses': [for (final e in expenses) e.toJson()],
         'monthCloses': [for (final m in monthCloses) m.toJson()],
         'monthStart': monthStart,
+        'expiryWarnDays': expiryWarnDays,
       };
 
   void _changed({bool save = true}) {
@@ -177,6 +181,21 @@ class WarehouseStore extends ChangeNotifier {
     ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
+  }
+
+  /// Adds an expiry date to an item, or replaces [replacing] with it; null [batch] removes [replacing].
+  void saveExpiry(String itemId, ExpiryBatch? batch, {ExpiryBatch? replacing}) {
+    final it = item(itemId);
+    if (it == null) return;
+    if (replacing != null) it.expiries.remove(replacing);
+    if (batch != null) it.expiries.add(batch);
+    it.expiries.sort((a, b) => a.date.compareTo(b.date));
+    _changed();
+  }
+
+  void setExpiryWarnDays(int days) {
+    expiryWarnDays = days;
+    _changed();
   }
 
   void setMonthBook(List<MonthClose> closes, String? start) {

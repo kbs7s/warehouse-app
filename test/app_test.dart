@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:warehouse_app/l10n.dart';
+import 'package:warehouse_app/expiry.dart';
 import 'package:warehouse_app/main.dart';
 import 'package:warehouse_app/month.dart';
 import 'package:warehouse_app/models.dart';
 import 'package:warehouse_app/pdf.dart';
 import 'package:warehouse_app/store.dart';
+import 'package:warehouse_app/ui.dart';
 
 void main() {
   late WarehouseStore store;
@@ -139,12 +141,14 @@ void main() {
         InvoiceLine(description: 'Delivery', qty: 1, unitPrice: 5000),
       ]));
       store.saveExpense(Expense(id: 'e1', date: '2026-10-03', category: 'Rent', amount: 300000));
+      store.saveExpiry('P001', ExpiryBatch(date: '2026-01-10', qty: 20, lot: 'A1'));
+      store.saveExpiry('P013', ExpiryBatch(date: isoDate(DateTime.now().add(const Duration(days: 20)))));
       await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
       expect(find.text('Issue to department'), findsOneWidget);
       expect(find.text('Reorder now'), findsOneWidget);
       for (final (section, pages) in [
         ('Issue', <String>[]),
-        ('Stock', ['Items', 'Reorder', 'Purchases', 'Reports']),
+        ('Stock', ['Items', 'Reorder', 'Expiry', 'Purchases', 'Reports']),
         ('Money', ['Overview', 'Invoices', 'Clients', 'Expenses', 'Supplier bills']),
         ('Month', <String>[]),
         ('Home', <String>[]),
@@ -225,6 +229,41 @@ void main() {
     expect(store.monthCloses.single.from, '2026-09-01');
     expect(find.text('September 2026'), findsOneWidget);
     expect(find.text('Since 1 Oct 2026'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  test('expiry alerts: expired, soon, later, and out-of-stock items left out', () {
+    store.saveExpiry('P001', ExpiryBatch(date: '2026-10-10', qty: 5));
+    store.saveExpiry('P001', ExpiryBatch(date: '2026-11-01'));
+    store.saveExpiry('P001', ExpiryBatch(date: '2027-12-01'));
+    store.saveExpiry('P003', ExpiryBatch(date: '2026-10-01')); // P003 has nothing in stock
+    final l = store.expiryList(today: '2026-10-18');
+    expect([for (final e in l) e.level], [ExpiryLevel.expired, ExpiryLevel.soon, ExpiryLevel.later]);
+    expect(l.first.daysLeft, -8);
+    expect(l[1].daysLeft, 14);
+    expect(store.expiryList(all: true, today: '2026-10-18').length, 4);
+    final copy = WarehouseStore(null)..applyJson(jsonDecode(jsonEncode(store.toJson())) as Map<String, dynamic>, save: false);
+    expect(copy.item('P001')!.expiries.map((e) => e.date), ['2026-10-10', '2026-11-01', '2027-12-01']);
+    expect(copy.item('P001')!.expiries.first.qty, 5);
+  });
+
+  testWidgets('expiry date is added from the item page and shows on the Expiry page', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Stock');
+    await t.tap(find.text('اسفنجة تعقيم'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('No expiry dates entered.'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Tap to choose'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('OK'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Lot / batch number (optional)'), 'L7');
+    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(store.item('P001')!.expiries.single.lot, 'L7');
+    expect(find.textContaining('lot L7'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 

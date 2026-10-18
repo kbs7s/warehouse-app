@@ -68,6 +68,27 @@ class SettingsScreen extends StatelessWidget {
         const SizedBox(height: 12),
         _BusinessCard(store: store),
         const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tx('Expiry warnings', 'تنبيهات الانتهاء'), style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text(tx('Warn me this many days before an expiry date.', 'نبّهني قبل تاريخ الانتهاء بهذا العدد من الأيام.')),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final d in const [30, 60, 90, 180])
+                  ChoiceChip(
+                    label: Text(tx('$d days', '$d يوماً')),
+                    selected: store.expiryWarnDays == d,
+                    showCheckmark: false,
+                    onSelected: (_) => store.setExpiryWarnDays(d),
+                  ),
+              ]),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 12),
         const SizedBox(height: 12),
         Card(
           child: Padding(

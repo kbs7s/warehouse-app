@@ -1,3 +1,4 @@
+import 'expiry.dart';
 import 'l10n.dart';
 import 'models.dart';
 import 'store.dart';
@@ -6,7 +7,7 @@ import 'ui.dart';
 enum InsightLevel { urgent, warning, good, tip }
 
 /// Where tapping an insight should take the user.
-enum InsightTarget { invoices, stock, money, supplierBills, settings, items }
+enum InsightTarget { invoices, stock, money, supplierBills, settings, items, expiry }
 
 class Insight {
   Insight(this.level, this.title, this.detail, {this.target});
@@ -43,6 +44,21 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
             'صُرف أكثر مما سُجّل دخوله (${short.take(3).map((id) => s.item(id)?.name ?? id).join('، ')}). '
                 'غالباً هناك شراء غير مسجّل، لذا ربح هذه المواد تقديري.'),
         target: InsightTarget.stock));
+  }
+
+  final exp = s.expiryAlerts;
+  final expired = exp.where((e) => e.level == ExpiryLevel.expired).length;
+  if (expired > 0) {
+    out.add(Insight(InsightLevel.urgent, tx('$expired expired batches still in stock', '$expired دفعات منتهية الصلاحية ما زالت في المخزن'),
+        tx('Take them off the shelf, then delete or update their expiry dates.', 'أخرجها من الرفوف ثم احذف تواريخها أو حدّثها.'),
+        target: InsightTarget.expiry));
+  }
+  if (exp.length > expired) {
+    out.add(Insight(InsightLevel.warning,
+        tx('${exp.length - expired} batches expire within ${s.expiryWarnDays} days', '${exp.length - expired} دفعات تنتهي خلال ${s.expiryWarnDays} يوماً'),
+        tx('Issue these first. The soonest: ${exp.firstWhere((e) => e.level != ExpiryLevel.expired).item.name}.',
+            'اصرفها أولاً. الأقرب: ${exp.firstWhere((e) => e.level != ExpiryLevel.expired).item.name}.'),
+        target: InsightTarget.expiry));
   }
 
   final out0 = s.stockList.where((x) => x.status == StockStatus.out).length;

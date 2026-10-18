@@ -5,6 +5,7 @@ import 'l10n.dart';
 import 'screens/client_screens.dart';
 import 'screens/equipment_screen.dart';
 import 'screens/expense_screens.dart';
+import 'screens/expiry_screens.dart';
 import 'screens/home_screen.dart';
 import 'screens/invoice_screens.dart';
 import 'screens/month_screen.dart';
@@ -96,6 +97,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     _Section('Stock', 'المخزون', Icons.inventory_2_outlined, Icons.inventory_2, [
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
+      ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
       ('Purchases', 'المشتريات', (s, _) => PurchasesScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
     ]),
@@ -138,6 +140,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
         InsightTarget.invoices => go('Money', 1),
         InsightTarget.stock => go('Stock', 1),
         InsightTarget.items => go('Stock'),
+        InsightTarget.expiry => go('Stock', 2),
         InsightTarget.money => go('Money'),
         InsightTarget.supplierBills => go('Money', 4),
         InsightTarget.settings => go('Settings'),

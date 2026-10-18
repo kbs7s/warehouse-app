@@ -7,6 +7,7 @@ import '../month.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
+import 'expiry_screens.dart';
 
 class ItemDetailScreen extends StatelessWidget {
   const ItemDetailScreen({super.key, required this.store, required this.itemId});
@@ -69,6 +70,7 @@ class ItemDetailScreen extends StatelessWidget {
                         'هذه السنة ${fmtQty(store.spentThisYear[itemId] ?? 0)} · الكلي ${fmtQty(s.issued + s.sold)}')),
               ]),
               if (s.item.note != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tx('Note: ${s.item.note}', 'ملاحظة: ${s.item.note}'))),
+              ItemExpirySection(store: store, item: s.item),
               SectionTitle(tx('Cost layers', 'دفعات الكلفة'), trailing: Text(s.item.id, style: t.textTheme.bodySmall)),
               Text(
                   tx('Each batch you bought keeps its own price. Sales and issues use the oldest batch first.',
@@ -283,6 +285,7 @@ class _ItemFormState extends State<_ItemForm> {
               note: note.isEmpty ? null : note,
               salePrice: parseNum(_sale.text),
               openingUnitCost: parseNum(_openCost.text),
+              expiries: widget.item?.expiries,
             ));
             Navigator.pop(context);
           },
