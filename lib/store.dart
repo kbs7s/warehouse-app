@@ -433,6 +433,39 @@ class WarehouseStore extends ChangeNotifier {
   /// Cost of one invoice line's stock (0 for services).
   num invoiceLineCost(int invoiceNo, int line) => ledger.lineCost['inv:$invoiceNo:$line'] ?? 0;
 
+  // ---------- Departments ----------
+
+  /// Adds a department; returns false when the name is empty or already there.
+  bool addDepartment(String name) {
+    final n = name.trim();
+    if (n.isEmpty || departments.contains(n)) return false;
+    departments.add(n);
+    _changed();
+    return true;
+  }
+
+  /// Renames a department everywhere, including the issues already given to it.
+  void renameDepartment(String from, String to) {
+    final n = to.trim();
+    if (n.isEmpty || n == from) return;
+    departments = [for (final d in departments) d == from ? n : d];
+    if (!departments.contains(n)) departments.add(n);
+    for (final r in receipts) {
+      if (r.department?.trim() == from) r.department = n;
+    }
+    for (final c in customers) {
+      if (c.department?.trim() == from) c.department = n;
+    }
+    departments = departments.toSet().toList();
+    _changed();
+  }
+
+  /// Takes a department off the pick list. Issues already given to it are kept.
+  void removeDepartment(String name) {
+    departments.remove(name);
+    _changed();
+  }
+
   void _remember({String? department, String? customer}) {
     final d = department?.trim();
     if (d != null && d.isNotEmpty && !departments.contains(d)) departments.add(d);

@@ -6,6 +6,7 @@ import '../store.dart';
 import '../sync.dart';
 import '../theme.dart';
 import '../ui.dart';
+import 'welcome_screen.dart' show LanguageChips;
 
 String _err(Object e) => e is CloudError ? _arError(e) : '$e';
 
@@ -482,5 +483,32 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tx('Cancel', 'إلغاء'))),
           FilledButton(onPressed: _busy ? null : _save, child: Text(tx('Add', 'إضافة'))),
         ],
+      );
+}
+
+/// Settings for team members: language and the online account.
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(tx('Account', 'الحساب'))),
+        body: PageBody(maxWidth: 720, children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                Expanded(child: Text('Language / اللغة', style: Theme.of(context).textTheme.titleLarge)),
+                LanguageChips(store: store),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 12),
+          CloudCard(store: store),
+          const SizedBox(height: 12),
+          Text(tx('Your account can issue supplies to departments. Ask the store owner for anything else.',
+              'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
+        ]),
       );
 }

@@ -50,6 +50,9 @@ class CloudSync extends ChangeNotifier {
   bool get signedIn => _client?.user != null;
   String? get email => _client?.user?.email;
   bool get isOwner => member?.isOwner ?? false;
+
+  /// Signed in as a team member who is not an owner: may only issue supplies.
+  bool get isStaff => signedIn && !isOwner;
   CloudClient? get client => _client;
 
   /// Picks up a saved sign-in on this device.
@@ -181,9 +184,21 @@ class CloudSync extends ChangeNotifier {
         member = await c.me();
         if (member == null) throw CloudError('PERMISSION_DENIED');
         await _saveSession();
+        store.refresh(); // the role decides which pages show
       }
       for (var attempt = 0; attempt < 5; attempt++) {
-        final local = _snapshot();
+        var local = _snapshot();
+        if (isStaff && _base != null) {
+          // Team members only issue supplies: anything else changed on their device is undone.
+          final allowed = {
+            ...jsonDecode(_base!) as Map<String, dynamic>,
+            for (final k in _staffKeys) k: local[k],
+          };
+          if (_canon(allowed) != _canon(local)) {
+            _apply(allowed);
+            local = _snapshot();
+          }
+        }
         final remote = await c.fetch();
         try {
           if (!store.started) {
@@ -251,6 +266,9 @@ class CloudSync extends ChangeNotifier {
       _applying = false;
     }
   }
+
+  /// What a team member's device may change: issues, and the departments and people named on them.
+  static const _staffKeys = ['receipts', 'departments', 'customers'];
 
   static const _emptyData = {'format': 'warehouse-backup', 'version': 2, 'source': 'Shared online store'};
 

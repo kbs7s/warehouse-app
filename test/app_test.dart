@@ -10,6 +10,7 @@ import 'package:warehouse_app/main.dart';
 import 'package:warehouse_app/month.dart';
 import 'package:warehouse_app/models.dart';
 import 'package:warehouse_app/pdf.dart';
+import 'package:warehouse_app/screens/departments_screen.dart';
 import 'package:warehouse_app/store.dart';
 import 'package:warehouse_app/ui.dart';
 
@@ -247,6 +248,50 @@ void main() {
     expect(copy.item('P001')!.expiries.first.qty, 5);
   });
 
+  testWidgets('departments page shows what each department took', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Issue', 'Departments');
+    await t.tap(find.widgetWithText(ChoiceChip, 'All time'));
+    await t.pumpAndSettle();
+    final top = departmentUse(store, '0000-01-01', '9999-12-31').first;
+    await t.tap(find.text(top.name).first);
+    await t.pumpAndSettle();
+    expect(find.text('Items taken'), findsOneWidget);
+    final (id, qty) = top.qty.entries.reduce((a, b) => a.value >= b.value ? a : b).let((e) => (e.key, e.value));
+    expect(find.text(store.item(id)!.name), findsWidgets);
+    expect(find.textContaining(fmtQty(qty)), findsWidgets);
+  });
+
+  test('departments can be added, renamed and removed', () {
+    expect(store.addDepartment('Pharmacy'), isTrue);
+    expect(store.addDepartment('Pharmacy'), isFalse);
+    final used = store.receipts.firstWhere((r) => r.department != null).department!;
+    final n = store.receipts.where((r) => r.department == used).length;
+    store.renameDepartment(used, 'Renamed dept');
+    expect(store.receipts.where((r) => r.department == 'Renamed dept').length, n);
+    expect(store.departments, contains('Renamed dept'));
+    store.removeDepartment('Pharmacy');
+    expect(store.departments, isNot(contains('Pharmacy')));
+  });
+
+  testWidgets('new item form on a phone saves with a unit chip', (t) async {
+    phone(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Stock');
+    await t.tap(find.text('New item'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextFormField, 'Item name'), 'كمامة جديدة');
+    final unit = store.items.first.unit;
+    await t.tap(find.widgetWithText(ChoiceChip, unit).first);
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(store.items.last.name, 'كمامة جديدة');
+    expect(store.items.last.unit, unit);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('expiry date is added from the item page and shows on the Expiry page', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
@@ -289,4 +334,8 @@ void main() {
 String todayIsoForTest() {
   final n = DateTime.now();
   return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+}
+
+extension<T> on T {
+  R let<R>(R Function(T) f) => f(this);
 }

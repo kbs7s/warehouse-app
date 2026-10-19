@@ -98,15 +98,17 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   late final _note = TextEditingController(text: widget.existing?.note);
   late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? <ReceiptLine>[]) _Line(l.itemId, l.qty)];
 
-  /// The departments most recently issued to, for one-tap picking.
+  /// Departments for one-tap picking.
   late final List<String> _recentDepts = () {
+    // Most recently used first, then the rest of the Settings list. Removed departments are left out.
+    final listed = store.departments.toSet();
     final seen = <String>{};
     for (final r in store.receipts.reversed) {
       final d = r.department?.trim() ?? '';
-      if (d.isNotEmpty) seen.add(d);
+      if (d.isNotEmpty && (listed.isEmpty || listed.contains(d))) seen.add(d);
       if (seen.length == 8) break;
     }
-    return seen.toList();
+    return [...seen, ...(store.departments.where((d) => !seen.contains(d)).toList()..sort())];
   }();
 
   @override

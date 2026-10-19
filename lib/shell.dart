@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'insights.dart';
 import 'l10n.dart';
 import 'screens/client_screens.dart';
+import 'screens/cloud_screens.dart';
+import 'screens/departments_screen.dart';
 import 'screens/equipment_screen.dart';
 import 'screens/expense_screens.dart';
 import 'screens/expiry_screens.dart';
@@ -93,6 +95,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     ]),
     _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
       ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
+      ('Departments', 'الأقسام', (s, _) => DepartmentsScreen(store: s)),
     ]),
     _Section('Stock', 'المخزون', Icons.inventory_2_outlined, Icons.inventory_2, [
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
@@ -119,14 +122,28 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     ], wideOnly: true),
   ];
 
+  /// Team members who are not owners only issue supplies to departments.
+  static final _staffSections = <_Section>[
+    _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
+      ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
+    ]),
+    _Section('Account', 'الحساب', Icons.person_outline, Icons.person, [
+      ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
+    ]),
+  ];
+
+  bool get _staff => widget.store.cloud?.isStaff ?? false;
+  List<_Section> get _secs => _staff ? _staffSections : _sections;
+
   @override
   void go(String section, [int page = 0]) {
-    final i = _sections.indexWhere((s) => s.key == section);
+    final i = _secs.indexWhere((s) => s.key == section);
+    if (i < 0) return;
     // Phones have no tab for wide-only sections (Equipment, Settings): open them as a page instead.
-    if (_sections[i].wideOnly && MediaQuery.sizeOf(context).width < 700) {
+    if (_secs[i].wideOnly && MediaQuery.sizeOf(context).width < 700) {
       Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => ListenableBuilder(
-              listenable: widget.store, builder: (_, _) => _sections[i].pages[page].$3(widget.store, this))));
+              listenable: widget.store, builder: (_, _) => _secs[i].pages[page].$3(widget.store, this))));
       return;
     }
     setState(() {
@@ -150,8 +167,10 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final phone = w < 700;
-    final visible = [for (final (i, s) in _sections.indexed) if (!phone || !s.wideOnly) i];
-    final sec = _sections[_section];
+    final sections = _secs;
+    if (_section >= sections.length) _section = 0;
+    final visible = [for (final (i, s) in sections.indexed) if (!phone || !s.wideOnly) i];
+    final sec = sections[_section];
     final pageIdx = _page[_section] ?? 0;
     final body = SubNav(
       labels: [for (final p in sec.pages) tx(p.$1, p.$2)],
@@ -180,7 +199,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
                 destinations: [
                   for (final i in visible)
                     NavigationDestination(
-                        icon: Icon(_sections[i].icon), selectedIcon: Icon(_sections[i].selectedIcon), label: _sections[i].label),
+                        icon: Icon(sections[i].icon), selectedIcon: Icon(sections[i].selectedIcon), label: sections[i].label),
                 ],
               ),
       );
@@ -213,7 +232,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
                 : _Logo(color: scheme.primary),
           ),
           destinations: [
-            for (final s in _sections)
+            for (final s in sections)
               NavigationRailDestination(icon: Icon(s.icon), selectedIcon: Icon(s.selectedIcon), label: Text(s.label)),
           ],
         ),

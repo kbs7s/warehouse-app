@@ -9,6 +9,7 @@ import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
 import 'cloud_screens.dart';
+import 'departments_screen.dart';
 import 'welcome_screen.dart' show LanguageChips;
 
 class SettingsScreen extends StatelessWidget {
@@ -75,6 +76,8 @@ class SettingsScreen extends StatelessWidget {
         CloudCard(store: store),
         const SizedBox(height: 12),
         _BusinessCard(store: store),
+        const SizedBox(height: 12),
+        DepartmentsCard(store: store),
         const SizedBox(height: 12),
         Card(
           child: Padding(

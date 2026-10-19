@@ -145,10 +145,20 @@ String _source(String s) {
 }
 
 /// Opens the add/edit item form. [item] null means a new item.
-Future<void> editItem(BuildContext context, WarehouseStore store, Item? item) => showDialog(
-      context: context,
-      builder: (_) => _ItemForm(store: store, item: item),
-    );
+/// New or edit item form: full screen on phones, a dialog on wider screens.
+Future<void> editItem(BuildContext context, WarehouseStore store, Item? item) {
+  final size = MediaQuery.sizeOf(context);
+  final form = _ItemForm(store: store, item: item);
+  return showDialog(
+    context: context,
+    builder: (_) => size.width < 700
+        ? Dialog.fullscreen(child: form)
+        : Dialog(
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(width: 560, height: size.height * .9 > 780 ? 780 : size.height * .9, child: form),
+          ),
+  );
+}
 
 class _ItemForm extends StatefulWidget {
   const _ItemForm({required this.store, this.item});
@@ -164,134 +174,210 @@ class _ItemFormState extends State<_ItemForm> {
   late final _id = TextEditingController(text: widget.item?.id ?? widget.store.nextItemId);
   late final _name = TextEditingController(text: widget.item?.name);
   late final _unit = TextEditingController(text: widget.item?.unit);
-  late final _opening = TextEditingController(text: fmtQty(widget.item?.openingQty ?? 0));
-  late final _min = TextEditingController(text: fmtQty(widget.item?.minLevel ?? 0));
+  late final _opening = TextEditingController(text: fmtQty(widget.item?.openingQty ?? 0).replaceAll(',', ''));
+  late final _min = TextEditingController(text: fmtQty(widget.item?.minLevel ?? 0).replaceAll(',', ''));
   late final _note = TextEditingController(text: widget.item?.note);
   late final _sale = TextEditingController(text: widget.item?.salePrice?.round().toString());
   late final _openCost = TextEditingController(text: widget.item?.openingUnitCost?.toString());
   late bool _active = widget.item?.active ?? true;
 
+  /// The units used most, for one-tap picking.
+  late final List<String> _units = () {
+    final count = <String, int>{};
+    for (final i in widget.store.items) {
+      final u = i.unit.trim();
+      if (u.isNotEmpty) count[u] = (count[u] ?? 0) + 1;
+    }
+    final l = count.keys.toList()..sort((a, b) => count[b]!.compareTo(count[a]!));
+    return l.take(8).toList();
+  }();
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    final note = _note.text.trim();
+    widget.store.saveItem(Item(
+      id: _id.text.trim(),
+      name: _name.text.trim(),
+      unit: _unit.text.trim(),
+      openingQty: parseNum(_opening.text)!,
+      minLevel: parseNum(_min.text)!,
+      category: widget.item?.category,
+      active: _active,
+      note: note.isEmpty ? null : note,
+      salePrice: parseNum(_sale.text),
+      openingUnitCost: parseNum(_openCost.text),
+      expiries: widget.item?.expiries,
+    ));
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final isNew = widget.item == null;
-    final units = {for (final i in widget.store.items) i.unit}.where((u) => u.isNotEmpty).toList()..sort();
     String? numCheck(String? v) => parseNum(v ?? '') == null ? tx('Enter a number', 'أدخل رقماً') : null;
     String? optNum(String? v) => (v ?? '').trim().isEmpty ? null : numCheck(v);
+    Widget section(String title, IconData icon, List<Widget> children, {String? hint}) => Card(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Icon(icon, size: 20, color: t.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(title, style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
+              ]),
+              if (hint != null) ...[
+                const SizedBox(height: 4),
+                Text(hint, style: TextStyle(color: t.colorScheme.onSurfaceVariant, fontSize: 13)),
+              ],
+              const SizedBox(height: 14),
+              ...children,
+            ]),
+          ),
+        );
+    // Two fields side by side when there is room, one under the other on narrow phones.
+    Widget pair(Widget a, Widget b) => LayoutBuilder(
+          builder: (_, c) => c.maxWidth < 360
+              ? Column(children: [a, const SizedBox(height: 12), b])
+              : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: a),
+                  const SizedBox(width: 12),
+                  Expanded(child: b),
+                ]),
+        );
 
-    return AlertDialog(
-      title: Text(isNew ? tx('New item', 'مادة جديدة') : tx('Edit item', 'تعديل المادة')),
-      content: SizedBox(
-        width: 520,
-        child: Form(
-          key: _form,
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(tooltip: tx('Cancel', 'إلغاء'), icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+        title: Text(isNew ? tx('New item', 'مادة جديدة') : tx('Edit item', 'تعديل المادة')),
+        actions: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 12),
+            child: FilledButton(onPressed: _save, child: Text(tx('Save', 'حفظ'))),
+          ),
+        ],
+      ),
+      body: Form(
+        key: _form,
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+          section(tx('Item', 'المادة'), Icons.inventory_2_outlined, [
+            ListenableBuilder(
+              listenable: _name,
+              builder: (_, _) => TextFormField(
+                controller: _name,
+                autofocus: isNew,
+                textDirection: dirOf(_name.text),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                decoration: InputDecoration(labelText: tx('Item name', 'اسم المادة'), hintText: tx('Arabic or English', 'بالعربي أو الإنكليزي')),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return tx('Enter a name', 'أدخل الاسم');
+                  if (widget.store.nameTaken(v, exceptId: widget.item?.id)) return tx('Another item has this name', 'توجد مادة أخرى بهذا الاسم');
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            pair(
               TextFormField(
                 controller: _id,
                 enabled: isNew,
-                decoration: InputDecoration(labelText: tx('Code', 'الرمز')),
+                decoration: InputDecoration(labelText: tx('Code', 'الرمز'), prefixIcon: const Icon(Icons.tag, size: 20)),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return tx('Enter a code', 'أدخل الرمز');
                   if (isNew && widget.store.item(v.trim()) != null) return tx('This code is already used', 'هذا الرمز مستخدم');
                   return null;
                 },
               ),
-              ListenableBuilder(
-                listenable: _name,
-                builder: (_, _) => TextFormField(
-                  controller: _name,
-                  autofocus: isNew,
-                  textDirection: dirOf(_name.text),
-                  decoration: InputDecoration(labelText: tx('Name (Arabic is fine)', 'الاسم')),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return tx('Enter a name', 'أدخل الاسم');
-                    if (widget.store.nameTaken(v, exceptId: widget.item?.id)) return tx('Another item has this name', 'توجد مادة أخرى بهذا الاسم');
-                    return null;
-                  },
-                ),
+              TextFormField(
+                controller: _unit,
+                decoration: InputDecoration(labelText: tx('Unit', 'الوحدة'), prefixIcon: const Icon(Icons.straighten, size: 20)),
+                onChanged: (_) => setState(() {}),
+                validator: (v) => (v == null || v.trim().isEmpty) ? tx('Enter a unit', 'أدخل الوحدة') : null,
               ),
-              Autocomplete<String>(
-                initialValue: TextEditingValue(text: _unit.text),
-                optionsBuilder: (v) => units.where((u) => u.contains(v.text)),
-                onSelected: (v) => _unit.text = v,
-                fieldViewBuilder: (context, c, focus, onSubmit) => TextFormField(
-                  controller: c,
-                  focusNode: focus,
-                  onChanged: (v) => _unit.text = v,
-                  decoration: InputDecoration(labelText: tx('Unit (e.g. قطعة, باكيت)', 'الوحدة (مثل قطعة، باكيت)')),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? tx('Enter a unit', 'أدخل الوحدة') : null,
-                ),
+            ),
+            if (_units.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final u in _units)
+                  ChoiceChip(
+                    label: Text(u),
+                    selected: _unit.text.trim() == u,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _unit.text = u),
+                  ),
+              ]),
+            ],
+          ]),
+          section(tx('Stock', 'المخزون'), Icons.warehouse_outlined, hint: tx('The app adds purchases and takes away issues by itself.', 'التطبيق يضيف المشتريات ويطرح الصرف تلقائياً.'), [
+            pair(
+              TextFormField(
+                controller: _opening,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: tx('Starting quantity', 'الكمية الأولى'), suffixText: _unit.text.trim()),
+                validator: numCheck,
               ),
-              Row(children: [
-                Expanded(
-                    child: TextFormField(
-                        controller: _opening,
-                        decoration: InputDecoration(labelText: tx('Opening quantity', 'الكمية الافتتاحية')),
-                        keyboardType: TextInputType.number,
-                        validator: numCheck)),
-                const SizedBox(width: 16),
-                Expanded(
-                    child: TextFormField(
-                        controller: _min,
-                        decoration: InputDecoration(labelText: tx('Minimum level (warn below)', 'الحد الأدنى (تنبيه دونه)')),
-                        keyboardType: TextInputType.number,
-                        validator: numCheck)),
-              ]),
-              Row(children: [
-                Expanded(
-                    child: TextFormField(
-                        controller: _sale,
-                        decoration: InputDecoration(
-                            labelText: tx('Usual selling price (IQD)', 'سعر البيع المعتاد (د.ع)'),
-                            helperText: tx('Suggested on invoices', 'يُقترح في الفواتير')),
-                        keyboardType: TextInputType.number,
-                        validator: optNum)),
-                const SizedBox(width: 16),
-                Expanded(
-                    child: TextFormField(
-                        controller: _openCost,
-                        decoration: InputDecoration(
-                            labelText: tx('Cost of each opening unit', 'كلفة الوحدة الافتتاحية'),
-                            helperText: tx('Empty = first purchase price', 'فارغ = سعر أول شراء')),
-                        keyboardType: TextInputType.number,
-                        validator: optNum)),
-              ]),
-              TextFormField(controller: _note, decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'))),
-              if (!isNew)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(tx('Active (show in lists)', 'فعّالة (تظهر في القوائم)')),
-                  value: _active,
-                  onChanged: (v) => setState(() => _active = v),
+              TextFormField(
+                controller: _min,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                    labelText: tx('Warn me below', 'نبّهني إذا قلّ عن'),
+                    suffixText: _unit.text.trim(),
+                    helperText: tx('0 = no warning', '0 = بدون تنبيه')),
+                validator: numCheck,
+              ),
+            ),
+          ]),
+          Card(
+            margin: const EdgeInsets.only(bottom: 14),
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              initiallyExpanded: (widget.item?.salePrice ?? widget.item?.openingUnitCost) != null,
+              leading: Icon(Icons.payments_outlined, color: t.colorScheme.primary),
+              title: Text(tx('Prices (optional)', 'الأسعار (اختياري)'), style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(tx('Only needed for invoices and stock value', 'تحتاجها فقط للفواتير وقيمة المخزون')),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                TextFormField(
+                  controller: _sale,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                      labelText: tx('Selling price', 'سعر البيع'),
+                      suffixText: tx('IQD', 'د.ع'),
+                      helperText: tx('Suggested when you make an invoice', 'يُقترح عند عمل فاتورة')),
+                  validator: optNum,
                 ),
-            ]),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _openCost,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                      labelText: tx('Cost of each starting unit', 'كلفة الوحدة من الكمية الأولى'),
+                      suffixText: tx('IQD', 'د.ع'),
+                      helperText: tx('Leave empty to use the first purchase price', 'اتركه فارغاً لاستخدام سعر أول شراء'),
+                      helperMaxLines: 2),
+                  validator: optNum,
+                ),
+              ],
+            ),
           ),
-        ),
+          section(tx('More', 'المزيد'), Icons.notes_outlined, [
+            TextFormField(
+              controller: _note,
+              minLines: 1,
+              maxLines: 3,
+              decoration: InputDecoration(labelText: tx('Note', 'ملاحظة')),
+            ),
+            if (!isNew)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tx('Active (show in lists)', 'فعّالة (تظهر في القوائم)')),
+                value: _active,
+                onChanged: (v) => setState(() => _active = v),
+              ),
+          ]),
+        ]),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(tx('Cancel', 'إلغاء'))),
-        FilledButton(
-          onPressed: () {
-            if (!_form.currentState!.validate()) return;
-            final note = _note.text.trim();
-            widget.store.saveItem(Item(
-              id: _id.text.trim(),
-              name: _name.text.trim(),
-              unit: _unit.text.trim(),
-              openingQty: parseNum(_opening.text)!,
-              minLevel: parseNum(_min.text)!,
-              category: widget.item?.category,
-              active: _active,
-              note: note.isEmpty ? null : note,
-              salePrice: parseNum(_sale.text),
-              openingUnitCost: parseNum(_openCost.text),
-              expiries: widget.item?.expiries,
-            ));
-            Navigator.pop(context);
-          },
-          child: Text(tx('Save', 'حفظ')),
-        ),
-      ],
     );
   }
 }

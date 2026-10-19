@@ -72,11 +72,20 @@ void main() {
       expect(s.stock('P002').qty, 4);
     }
 
-    // An edit on one device reaches the other on its next sync.
-    staffStore.saveItem(staffStore.item('P002')!..minLevel = 3);
+    // An owner's edit reaches the staff device on its next sync.
+    ownerStore.saveItem(ownerStore.item('P002')!..minLevel = 3);
+    await owner.syncNow();
+    await staff.syncNow();
+    expect(staffStore.item('P002')!.minLevel, 3);
+
+    // Staff may only issue: other changes on their device are undone and never reach the owner.
+    staffStore.saveItem(staffStore.item('P001')!..minLevel = 99);
+    staffStore.saveReceipt(Receipt(no: 3, date: '2026-10-19', department: 'ER', lines: [ReceiptLine(itemId: 'P001', qty: 1)]));
     await staff.syncNow();
     await owner.syncNow();
-    expect(ownerStore.item('P002')!.minLevel, 3);
+    expect(staffStore.item('P001')!.minLevel, 0);
+    expect(ownerStore.item('P001')!.minLevel, 0);
+    expect(ownerStore.receipts.map((r) => r.department), contains('ER'));
 
     // Removing a member locks them out.
     await owner.client!.removeMember('staff@example.com');
