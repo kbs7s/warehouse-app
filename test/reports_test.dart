@@ -49,7 +49,7 @@ void main() {
     final s = seeded();
     final bytes = buildXlsx(workbookSheets(s, DateTime(2026, 10, 1)));
     final zip = ZipDecoder().decodeBytes(bytes);
-    expect(zip.files.where((f) => f.name.startsWith('xl/worksheets/')).length, 7);
+    expect(zip.files.where((f) => f.name.startsWith('xl/worksheets/')).length, 8);
     File('build/export-test.xlsx')
       ..createSync(recursive: true)
       ..writeAsBytesSync(bytes);

@@ -284,6 +284,9 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void savePurchase(Purchase p, {int? replacingNo}) {
+    final old = purchases.where((x) => x.no == (replacingNo ?? p.no)).firstOrNull;
+    if (old != null) _purchaseExpiries(old, add: false);
+    _purchaseExpiries(p, add: true);
     purchases.removeWhere((x) => x.no == (replacingNo ?? p.no));
     purchases.add(p);
     purchases.sort((a, b) => a.no.compareTo(b.no));
@@ -293,8 +296,50 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void deletePurchase(int no) {
+    for (final p in purchases.where((p) => p.no == no)) {
+      _purchaseExpiries(p, add: false);
+    }
     purchases.removeWhere((p) => p.no == no);
     _changed();
+  }
+
+  /// Keeps the expiry dates typed on a purchase's lines on the items themselves.
+  void _purchaseExpiries(Purchase p, {required bool add}) {
+    for (final l in p.lines) {
+      final it = item(l.itemId);
+      if (l.expiry == null || it == null) continue;
+      if (add) {
+        it.expiries.add(ExpiryBatch(date: l.expiry!, qty: l.qty, lot: l.lot));
+        it.expiries.sort((a, b) => a.date.compareTo(b.date));
+      } else {
+        // The exact batch if it is unchanged, otherwise the same date and lot edited on the expiry page.
+        final same = it.expiries.where((b) => b.date == l.expiry && b.lot == l.lot);
+        final b = same.where((b) => b.qty == l.qty).firstOrNull ?? same.firstOrNull;
+        if (b != null) it.expiries.remove(b);
+      }
+    }
+  }
+
+  /// Purchases and suppliers' payment state.
+  List<Purchase> purchasesOf(String supplier) => [for (final p in purchases) if ((p.supplier ?? '') == supplier) p];
+  num owedTo(String supplier) => purchasesOf(supplier).fold<num>(0, (s, p) => s + p.owed);
+
+  /// Records [amount] paid to [supplier], settling their oldest unpaid purchases first.
+  /// Returns what was left over because nothing more was owed.
+  num paySupplier(String supplier, num amount, {required String date, String? note}) {
+    var left = amount;
+    final open = purchasesOf(supplier).where((p) => p.owed > 0).toList()
+      ..sort((a, b) => (a.date ?? '').compareTo(b.date ?? '') != 0
+          ? (a.date ?? '').compareTo(b.date ?? '')
+          : a.no.compareTo(b.no));
+    for (final p in open) {
+      if (left <= 0) break;
+      final part = left < p.owed ? left : p.owed;
+      p.paidLog!.add(PurchasePaid(amount: part, date: date, note: note));
+      left -= part;
+    }
+    _changed();
+    return left;
   }
 
   int get nextPaymentNo => payments.fold<int>(0, (m, p) => p.no > m ? p.no : m) + 1;
@@ -401,7 +446,11 @@ class WarehouseStore extends ChangeNotifier {
   List<Invoice> invoicesOf(String clientId) => [for (final i in invoices) if (i.clientId == clientId) i];
   num owedBy(String clientId) => invoicesOf(clientId).fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
   num get owedToUs => invoices.fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
-  num get weOwe => payments.fold<num>(0, (s, p) => s + (p.remaining > 0 ? p.remaining : 0));
+  /// Still owed on purchases whose payment is tracked.
+  num get weOwe => purchases.fold<num>(0, (s, p) => s + p.owed);
+
+  /// Older supplier bills (the Excel تسديد sheet) not yet fully paid.
+  List<Payment> get openBills => [for (final p in payments) if (!p.settled) p];
   List<Invoice> overdue(String today) => [for (final i in invoices) if (i.status(today) == InvoiceStatus.overdue) i];
 
   void saveExpense(Expense e) {

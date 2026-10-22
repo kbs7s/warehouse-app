@@ -13,8 +13,9 @@ import 'departments_screen.dart';
 import 'welcome_screen.dart' show LanguageChips;
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.store});
+  const SettingsScreen({super.key, required this.store, this.shell});
   final WarehouseStore store;
+  final Shell? shell;
 
   Future<void> _backup(BuildContext context) async {
     final name = 'warehouse-backup-${todayIso()}.json';
@@ -78,6 +79,18 @@ class SettingsScreen extends StatelessWidget {
         _BusinessCard(store: store),
         const SizedBox(height: 12),
         DepartmentsCard(store: store),
+        if (shell != null) ...[
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: Text(tx('Sales, clients and expenses', 'المبيعات والزبائن والمصاريف')),
+              subtitle: Text(tx('Invoices to clients, running costs and profit.', 'فواتير الزبائن والمصاريف والأرباح.')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => shell!.go('Money'),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Card(
           child: Padding(

@@ -7,7 +7,7 @@ import '../store.dart';
 import '../ui.dart';
 import 'item_picker.dart';
 
-/// Supplier invoices and what is still owed (Excel sheet تسديد).
+/// Older supplier bills without item lines, and what is still owed on them (Excel sheet تسديد).
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({super.key, required this.store});
   final WarehouseStore store;
@@ -32,7 +32,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     num sum(num Function(Payment) f) => all.fold<num>(0, (s, p) => s + f(p));
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Supplier payments', 'فواتير المجهزين')), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Older bills', 'قوائم سابقة')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),

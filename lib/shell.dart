@@ -18,6 +18,7 @@ import 'screens/receipt_screens.dart';
 import 'screens/reports_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stock_screen.dart';
+import 'screens/supplier_screens.dart';
 import 'store.dart';
 
 /// Sub-page chips shown under a section's title (e.g. Invoices | Clients).
@@ -61,7 +62,7 @@ class SubNav extends InheritedWidget {
 }
 
 class _Section {
-  const _Section(this.key, this.ar, this.icon, this.selectedIcon, this.pages, {this.wideOnly = false});
+  const _Section(this.key, this.ar, this.icon, this.selectedIcon, this.pages, {this.wideOnly = false, this.hidden = false});
   /// Stable English name used by [Shell.go], whatever the interface language.
   final String key;
   final String ar;
@@ -69,6 +70,9 @@ class _Section {
   final List<(String, String, Widget Function(WarehouseStore, Shell))> pages;
   String get label => tx(key, ar);
   final bool wideOnly;
+
+  /// Not in the navigation: opened as a page from elsewhere (Settings, home tiles).
+  final bool hidden;
 }
 
 /// Lets screens jump to another section (e.g. the home screen's "Needs attention" list).
@@ -101,25 +105,29 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
       ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
-      ('Purchases', 'المشتريات', (s, _) => PurchasesScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
+    ]),
+    _Section('Purchases', 'المشتريات', Icons.shopping_cart_outlined, Icons.shopping_cart, [
+      ('Purchases', 'قوائم الشراء', (s, _) => PurchasesScreen(store: s)),
+      ('Payments', 'التسديد', (s, _) => SupplierPaymentsScreen(store: s)),
+      ('Older bills', 'قوائم سابقة', (s, _) => PaymentsScreen(store: s)),
     ]),
     _Section('Month', 'الشهر', Icons.event_note_outlined, Icons.event_note, [
       ('Month end', 'نهاية الشهر', (s, _) => MonthScreen(store: s)),
-    ]),
-    _Section('Money', 'المالية', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
-      ('Overview', 'نظرة عامة', (s, _) => ProfitScreen(store: s)),
-      ('Invoices', 'الفواتير', (s, _) => InvoicesScreen(store: s)),
-      ('Clients', 'الزبائن', (s, _) => ClientsScreen(store: s)),
-      ('Expenses', 'المصاريف', (s, _) => ExpensesScreen(store: s)),
-      ('Supplier bills', 'فواتير المجهزين', (s, _) => PaymentsScreen(store: s)),
     ]),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [
       ('Equipment', 'المعدات', (s, _) => EquipmentScreen(store: s)),
     ], wideOnly: true),
     _Section('Settings', 'الإعدادات', Icons.settings_outlined, Icons.settings, [
-      ('Settings', 'الإعدادات', (s, _) => SettingsScreen(store: s)),
+      ('Settings', 'الإعدادات', (s, sh) => SettingsScreen(store: s, shell: sh)),
     ], wideOnly: true),
+    // Selling to clients: kept for older data, opened from Settings.
+    _Section('Money', 'المبيعات والمصاريف', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
+      ('Overview', 'نظرة عامة', (s, _) => ProfitScreen(store: s)),
+      ('Invoices', 'الفواتير', (s, _) => InvoicesScreen(store: s)),
+      ('Clients', 'الزبائن', (s, _) => ClientsScreen(store: s)),
+      ('Expenses', 'المصاريف', (s, _) => ExpensesScreen(store: s)),
+    ], hidden: true),
   ];
 
   /// Team members who are not owners only issue supplies to departments.
@@ -139,11 +147,10 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   void go(String section, [int page = 0]) {
     final i = _secs.indexWhere((s) => s.key == section);
     if (i < 0) return;
-    // Phones have no tab for wide-only sections (Equipment, Settings): open them as a page instead.
-    if (_secs[i].wideOnly && MediaQuery.sizeOf(context).width < 700) {
-      Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ListenableBuilder(
-              listenable: widget.store, builder: (_, _) => _secs[i].pages[page].$3(widget.store, this))));
+    // Phones have no tab for wide-only sections (Equipment, Settings), and hidden ones have none anywhere:
+    // open them as a page instead.
+    if (_secs[i].hidden || (_secs[i].wideOnly && MediaQuery.sizeOf(context).width < 700)) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => _SectionPage(section: _secs[i], page: page, store: widget.store, shell: this)));
       return;
     }
     setState(() {
@@ -159,7 +166,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
         InsightTarget.items => go('Stock'),
         InsightTarget.expiry => go('Stock', 2),
         InsightTarget.money => go('Money'),
-        InsightTarget.supplierBills => go('Money', 4),
+        InsightTarget.supplierBills => go('Purchases', 1),
         InsightTarget.settings => go('Settings'),
       };
 
@@ -168,8 +175,8 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     final w = MediaQuery.sizeOf(context).width;
     final phone = w < 700;
     final sections = _secs;
-    if (_section >= sections.length) _section = 0;
-    final visible = [for (final (i, s) in sections.indexed) if (!phone || !s.wideOnly) i];
+    if (_section >= sections.length || sections[_section].hidden) _section = 0;
+    final visible = [for (final (i, s) in sections.indexed) if (!s.hidden && (!phone || !s.wideOnly)) i];
     final sec = sections[_section];
     final pageIdx = _page[_section] ?? 0;
     final body = SubNav(
@@ -212,8 +219,8 @@ class _HomeShellState extends State<HomeShell> implements Shell {
         NavigationRail(
           extended: extended,
           minExtendedWidth: 220,
-          selectedIndex: _section,
-          onDestinationSelected: (i) => setState(() => _section = i),
+          selectedIndex: visible.indexOf(_section),
+          onDestinationSelected: (i) => setState(() => _section = visible[i]),
           labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
           leading: Padding(
             padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
@@ -232,7 +239,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
                 : _Logo(color: scheme.primary),
           ),
           destinations: [
-            for (final s in sections)
+            for (final s in [for (final i in visible) sections[i]])
               NavigationRailDestination(icon: Icon(s.icon), selectedIcon: Icon(s.selectedIcon), label: Text(s.label)),
           ],
         ),
@@ -241,6 +248,33 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ]),
     );
   }
+}
+
+/// A section opened as its own page, with its sub-page chips.
+class _SectionPage extends StatefulWidget {
+  const _SectionPage({required this.section, required this.page, required this.store, required this.shell});
+  final _Section section;
+  final int page;
+  final WarehouseStore store;
+  final Shell shell;
+
+  @override
+  State<_SectionPage> createState() => _SectionPageState();
+}
+
+class _SectionPageState extends State<_SectionPage> {
+  late int _page = widget.page;
+
+  @override
+  Widget build(BuildContext context) => SubNav(
+        labels: [for (final p in widget.section.pages) tx(p.$1, p.$2)],
+        index: _page,
+        onSelect: (i) => setState(() => _page = i),
+        child: ListenableBuilder(
+          listenable: widget.store,
+          builder: (_, _) => KeyedSubtree(key: ValueKey(_page), child: widget.section.pages[_page].$3(widget.store, widget.shell)),
+        ),
+      );
 }
 
 class _Logo extends StatelessWidget {

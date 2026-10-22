@@ -89,7 +89,11 @@ void main() {
   testWidgets('invoice for a new client takes stock out and records a payment', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-    await go(t, 'Money', 'Invoices');
+    await go(t, 'Settings');
+    await t.tap(find.text('Sales, clients and expenses'));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(ChoiceChip, 'Invoices'));
+    await t.pumpAndSettle();
     await t.tap(find.text('New invoice').first);
     await t.pumpAndSettle();
     await t.tap(find.text('Choose client'));
@@ -149,8 +153,8 @@ void main() {
       expect(find.text('Reorder now'), findsOneWidget);
       for (final (section, pages) in [
         ('Issue', <String>[]),
-        ('Stock', ['Items', 'Reorder', 'Expiry', 'Purchases', 'Reports']),
-        ('Money', ['Overview', 'Invoices', 'Clients', 'Expenses', 'Supplier bills']),
+        ('Stock', ['Items', 'Reorder', 'Expiry', 'Reports']),
+        ('Purchases', ['Purchases', 'Payments', 'Older bills']),
         ('Month', <String>[]),
         ('Home', <String>[]),
       ]) {
@@ -182,7 +186,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('صرف إلى قسم'), findsWidgets);
       expect(Directionality.of(t.element(find.byType(HomeShell))), TextDirection.rtl);
-      for (final section in ['الصرف', 'المخزون', 'الشهر', 'المالية', 'الرئيسية']) {
+      for (final section in ['الصرف', 'المخزون', 'الشهر', 'المشتريات', 'الرئيسية']) {
         await t.tap(find.text(section).last);
         await t.pumpAndSettle();
       }
@@ -311,6 +315,100 @@ void main() {
     expect(find.textContaining('lot L7'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
+
+  test('purchase expiry dates go on the item and follow edits and deletes', () {
+    final before = store.item('P001')!.expiries.length;
+    final p = Purchase(no: 90, date: '2026-10-20', supplier: 'زانيار', lines: [
+      PurchaseLine(itemId: 'P001', qty: 50, unitPrice: 1000, expiry: '2027-05-01', lot: 'B9'),
+      PurchaseLine(itemId: 'P013', qty: 5, unitPrice: 2000),
+    ], paidLog: []);
+    store.savePurchase(p);
+    expect(store.item('P001')!.expiries.length, before + 1);
+    expect(store.item('P001')!.expiries.last.lot, 'B9');
+    expect(store.item('P001')!.expiries.last.qty, 50);
+
+    store.savePurchase(Purchase(no: 90, date: '2026-10-20', supplier: 'زانيار', lines: [
+      PurchaseLine(itemId: 'P001', qty: 40, unitPrice: 1000, expiry: '2027-06-01', lot: 'B9'),
+    ], paidLog: []));
+    expect(store.item('P001')!.expiries.where((b) => b.lot == 'B9').single.date, '2027-06-01');
+
+    store.deletePurchase(90);
+    expect(store.item('P001')!.expiries.length, before);
+  });
+
+  test('paying a supplier settles the oldest purchases first', () {
+    final owedBefore = store.weOwe;
+    store.savePurchase(Purchase(no: 91, date: '2026-10-01', supplier: 'S1', lines: [PurchaseLine(itemId: 'P001', qty: 10, unitPrice: 1000)], paidLog: []));
+    store.savePurchase(Purchase(no: 92, date: '2026-10-05', supplier: 'S1', lines: [PurchaseLine(itemId: 'P001', qty: 5, unitPrice: 1000)], paidLog: []));
+    expect(store.owedTo('S1'), 15000);
+    expect(store.weOwe, owedBefore + 15000);
+    expect(store.paySupplier('S1', 12000, date: '2026-10-10'), 0);
+    final a = store.purchases.firstWhere((p) => p.no == 91), b = store.purchases.firstWhere((p) => p.no == 92);
+    expect(a.settled, isTrue);
+    expect(b.paid, 2000);
+    expect(b.owed, 3000);
+
+    // Survives a backup, and older purchases without payment records owe nothing.
+    final copy = WarehouseStore(null)..applyJson(jsonDecode(jsonEncode(store.toJson())) as Map<String, dynamic>, save: false);
+    expect(copy.owedTo('S1'), 3000);
+    expect(Purchase.fromJson({'no': 1, 'lines': [{'itemId': 'P001', 'qty': 2, 'total': 500}]}).owed, 0);
+  });
+
+  for (final (name, setSize) in [('phone', phone), ('iPad', ipad)]) {
+    testWidgets('purchase with expiry date and a part payment on $name', (t) async {
+      setSize(t);
+      await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+      await go(t, 'Purchases');
+      await t.tap(find.text('New purchase'));
+      await t.pumpAndSettle();
+      await t.enterText(find.widgetWithText(TextField, 'Supplier'), 'زانيار');
+      await t.tap(find.text('Add item'));
+      await t.pumpAndSettle();
+      await t.enterText(find.widgetWithText(TextField, 'Type part of the item name'), 'اسفنجة');
+      await t.pumpAndSettle();
+      await t.tap(find.text('اسفنجة تعقيم'));
+      await t.pumpAndSettle();
+      await t.enterText(find.widgetWithText(TextField, 'Qty'), '10');
+      await t.enterText(find.widgetWithText(TextField, 'Unit price'), '1500');
+      await t.pumpAndSettle();
+      await t.tap(find.text('Expiry date'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('OK'));
+      await t.pumpAndSettle();
+      await t.enterText(find.widgetWithText(TextField, 'Batch / lot'), 'Z1');
+      await t.ensureVisible(find.text('Add payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Add payment'));
+      await t.pumpAndSettle();
+      await t.enterText(find.widgetWithText(TextField, 'Amount paid (IQD)'), '5000');
+      await t.tap(find.widgetWithText(FilledButton, 'Add'));
+      await t.pumpAndSettle();
+      expect(find.text('10,000 IQD'), findsOneWidget); // still owed
+      await t.tap(find.widgetWithText(FilledButton, 'Save'));
+      await t.pumpAndSettle();
+
+      final p = store.purchases.last;
+      expect(p.supplier, 'زانيار');
+      expect(p.total, 15000);
+      expect(p.paid, 5000);
+      expect(p.lines.single.lot, 'Z1');
+      expect(store.item('P001')!.expiries.where((b) => b.lot == 'Z1'), hasLength(1));
+      expect(find.text('Owed 10,000 IQD'), findsOneWidget);
+
+      await t.tap(find.widgetWithText(ChoiceChip, 'Payments'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('زانيار').first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Record payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('All of it'));
+      await t.tap(find.widgetWithText(FilledButton, 'Save'));
+      await t.pumpAndSettle();
+      expect(p.settled, isTrue);
+      expect(store.owedTo('زانيار'), 0);
+      expect(t.takeException(), isNull);
+    });
+  }
 
   test('receipt and invoice PDFs build with Arabic names', () async {
     TestWidgetsFlutterBinding.ensureInitialized();

@@ -122,13 +122,15 @@ class Receipt {
 }
 
 class PurchaseLine {
-  PurchaseLine({required this.itemId, required this.qty, this.unitPrice, num? total, this.note})
+  PurchaseLine({required this.itemId, required this.qty, this.unitPrice, num? total, this.note, this.expiry, this.lot})
       : total = total ?? (unitPrice ?? 0) * qty;
   String itemId;
   num qty;
   num? unitPrice; // IQD
   num total; // IQD
   String? note;
+  String? expiry; // yyyy-MM-dd; saving the purchase adds it to the item's expiry dates
+  String? lot;
 
   factory PurchaseLine.fromJson(Map<String, dynamic> j) => PurchaseLine(
         itemId: j['itemId'] as String,
@@ -136,36 +138,72 @@ class PurchaseLine {
         unitPrice: j['unitPrice'] as num?,
         total: _n(j['total']),
         note: j['note'] as String?,
+        expiry: j['expiry'] as String?,
+        lot: j['lot'] as String?,
       );
-  Map<String, dynamic> toJson() =>
-      {'itemId': itemId, 'qty': qty, 'unitPrice': unitPrice, 'total': total, 'note': note};
+  Map<String, dynamic> toJson() => {
+        'itemId': itemId,
+        'qty': qty,
+        'unitPrice': unitPrice,
+        'total': total,
+        'note': note,
+        if (expiry != null) 'expiry': expiry,
+        if (lot != null) 'lot': lot,
+      };
+}
+
+/// Money paid to the supplier against one purchase.
+class PurchasePaid {
+  PurchasePaid({required this.amount, this.date, this.note});
+  num amount;
+  String? date;
+  String? note;
+
+  factory PurchasePaid.fromJson(Map<String, dynamic> j) =>
+      PurchasePaid(amount: _n(j['amount']), date: j['date'] as String?, note: j['note'] as String?);
+  Map<String, dynamic> toJson() => {'amount': amount, 'date': date, if (note != null) 'note': note};
 }
 
 /// Items bought from a supplier.
 class Purchase {
-  Purchase({required this.no, this.date, this.supplier, this.note, List<PurchaseLine>? lines})
+  Purchase({required this.no, this.date, this.supplier, this.note, this.ref, List<PurchaseLine>? lines, this.paidLog})
       : lines = lines ?? [];
   int no;
   String? date;
   String? supplier;
   String? note;
+  String? ref; // the supplier's own invoice number
   List<PurchaseLine> lines;
 
+  /// Payments made on this purchase. Null for older purchases whose payment was never recorded:
+  /// those count as neither paid nor owed.
+  List<PurchasePaid>? paidLog;
+
   num get total => lines.fold<num>(0, (s, l) => s + l.total);
+  bool get tracked => paidLog != null;
+  num get paid => (paidLog ?? const []).fold<num>(0, (s, p) => s + p.amount);
+  num get owed => tracked && total > paid ? total - paid : 0;
+  bool get settled => tracked && owed <= 0;
 
   factory Purchase.fromJson(Map<String, dynamic> j) => Purchase(
         no: (j['no'] as num).toInt(),
         date: j['date'] as String?,
         supplier: j['supplier'] as String?,
         note: j['note'] as String?,
+        ref: j['ref'] as String?,
         lines: [for (final l in (j['lines'] as List? ?? [])) PurchaseLine.fromJson(l as Map<String, dynamic>)],
+        paidLog: j['paidLog'] == null
+            ? null
+            : [for (final p in j['paidLog'] as List) PurchasePaid.fromJson(p as Map<String, dynamic>)],
       );
   Map<String, dynamic> toJson() => {
         'no': no,
         'date': date,
         'supplier': supplier,
         'note': note,
+        if (ref != null) 'ref': ref,
         'lines': [for (final l in lines) l.toJson()],
+        if (paidLog != null) 'paidLog': [for (final p in paidLog!) p.toJson()],
       };
 }
 

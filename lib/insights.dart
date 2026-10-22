@@ -68,12 +68,16 @@ List<Insight> buildInsights(WarehouseStore s, {DateTime? now}) {
         tx('These items are at or under the minimum level you set.', 'هذه المواد عند الحد الأدنى الذي حددته أو أقل.'), target: InsightTarget.stock));
   }
 
-  if (s.weOwe > 0) {
-    out.add(Insight(InsightLevel.tip, tx('You owe suppliers ${fmtMoney(s.weOwe)}', 'عليك للمجهزين ${fmtMoney(s.weOwe)}'),
-        s.owedToUs > 0
-            ? tx('Unpaid supplier bills. Plan these payments against the money clients owe you (${fmtMoney(s.owedToUs)}).',
-                'فواتير مجهزين غير مدفوعة. خطط لدفعها مقابل ما على الزبائن لك (${fmtMoney(s.owedToUs)}).')
-            : tx('Unpaid supplier bills. Open the list to see who is still owed.', 'قوائم مجهزين غير مسددة. افتح القائمة لترى لمن تبقّى مبلغ.'),
+  final bills = s.openBills.length;
+  if (s.weOwe > 0 || bills > 0) {
+    final billsNote = bills == 0
+        ? ''
+        : tx(' Also $bills older ${bills == 1 ? 'bill' : 'bills'} not fully paid.', ' وأيضاً $bills من القوائم السابقة غير مسددة بالكامل.');
+    out.add(Insight(InsightLevel.tip,
+        s.weOwe > 0
+            ? tx('You owe suppliers ${fmtMoney(s.weOwe)}', 'عليك للمجهزين ${fmtMoney(s.weOwe)}')
+            : tx('$bills older supplier bills not fully paid', '$bills قوائم مجهزين سابقة غير مسددة'),
+        tx('Open Payments to see who is still owed and record what you pay.', 'افتح التسديد لترى لمن تبقّى مبلغ وسجّل ما تدفعه.') + (s.weOwe > 0 ? billsNote : ''),
         target: InsightTarget.supplierBills));
   }
 

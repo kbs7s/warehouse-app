@@ -55,11 +55,19 @@ List<Sheet> workbookSheets(WarehouseStore s, DateTime now) {
     ]),
     Sheet(tx('Purchases', 'المشتريات'), [
       for (final (en, ar) in [('Purchase #', 'رقم الشراء'), ('Date', 'التاريخ'), ('Supplier', 'المجهز'), ('Code', 'الرمز'), ('Item', 'المادة'),
-        ('Qty', 'الكمية'), ('Unit', 'الوحدة'), ('Unit price', 'سعر الوحدة'), ('Total', 'المجموع'), ('Note', 'ملاحظة')]) tx(en, ar),
+        ('Qty', 'الكمية'), ('Unit', 'الوحدة'), ('Unit price', 'سعر الوحدة'), ('Total', 'المجموع'), ('Expiry', 'تاريخ الانتهاء'),
+        ('Lot', 'الوجبة'), ('Note', 'ملاحظة')]) tx(en, ar),
     ], [
       for (final p in s.purchases)
         for (final l in p.lines)
-          [p.no, p.date, p.supplier, l.itemId, name(l.itemId), l.qty, unit(l.itemId), l.unitPrice, l.total, l.note ?? p.note],
+          [p.no, p.date, p.supplier, l.itemId, name(l.itemId), l.qty, unit(l.itemId), l.unitPrice, l.total, l.expiry, l.lot, l.note ?? p.note],
+    ]),
+    Sheet(tx('Supplier payments', 'تسديد المشتريات'), [
+      for (final (en, ar) in [('Purchase #', 'رقم الشراء'), ('Date', 'التاريخ'), ('Supplier', 'المجهز'), ("Supplier's bill no.", 'رقم قائمة المجهز'),
+        ('Total', 'المجموع'), ('Paid', 'المدفوع'), ('Still owed', 'المتبقي')]) tx(en, ar),
+    ], [
+      for (final p in s.purchases)
+        if (p.tracked) [p.no, p.date, p.supplier, p.ref, p.total, p.paid, p.owed],
     ]),
     Sheet(tx('Monthly use', 'الاستهلاك الشهري'),
         [tx('Code', 'الرمز'), tx('Item', 'المادة'), tx('Unit', 'الوحدة'), ...months.map(monthLabel), tx('Total', 'المجموع')], [
