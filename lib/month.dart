@@ -82,6 +82,18 @@ extension MonthBook on WarehouseStore {
   /// Spent (issued) in the open month, per item.
   Map<String, num> get spentThisMonth => issuedBetween(openMonthStart);
 
+  /// Bought in the open month, per item.
+  Map<String, num> get boughtThisMonth {
+    final from = openMonthStart, out = <String, num>{};
+    for (final p in purchases) {
+      if ((p.date ?? '').compareTo(from) < 0) continue;
+      for (final l in p.lines) {
+        out[l.itemId] = (out[l.itemId] ?? 0) + l.qty;
+      }
+    }
+    return out;
+  }
+
   /// Spent (issued) since 1 January, per item.
   Map<String, num> get spentThisYear => issuedBetween('${DateTime.now().year}-01-01');
 

@@ -43,14 +43,15 @@ void main() {
     }
   }
 
-  testWidgets('stock screen lists items and filters low stock', (t) async {
+  testWidgets('stock screen lists items and filters out-of-stock ones', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
     await go(t, 'Stock');
     expect(find.text('اسفنجة تعقيم'), findsOneWidget);
-    await t.tap(find.textContaining('Low '));
+    expect(find.textContaining('Low '), findsNothing);
+    expect(find.text('Min'), findsNothing);
+    await t.tap(find.textContaining('Out '));
     await t.pump();
-    expect(find.text('شرشف لاستيك مريض'), findsOneWidget);
     expect(find.text('اسفنجة تعقيم'), findsNothing);
   });
 
@@ -60,7 +61,9 @@ void main() {
     await go(t, 'Issue');
     await t.tap(find.text('Issue supplies'));
     await t.pumpAndSettle();
-    await t.enterText(find.widgetWithText(TextField, 'Department'), 'NICU');
+    await t.tap(find.widgetWithText(ChoiceChip, 'NICU'));
+    await t.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Note'), findsNothing);
     await t.tap(find.text('Add item'));
     await t.pumpAndSettle();
     await t.enterText(find.widgetWithText(TextField, 'Type part of the item name'), 'اسفنجة');
@@ -74,16 +77,41 @@ void main() {
     expect(store.stock('P001').qty, 500);
   });
 
-  testWidgets('issue form offers recent departments as one-tap chips', (t) async {
+  testWidgets('issue form picks the department from the Settings list only', (t) async {
     ipad(t);
+    store.renameDepartment('NICU', 'الخدج');
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
     await go(t, 'Issue');
     await t.tap(find.text('Issue supplies'));
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(ActionChip, 'NICU'));
+    expect(find.widgetWithText(TextField, 'Department'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, 'NICU'), findsNothing);
+    await t.tap(find.widgetWithText(ChoiceChip, 'الخدج'));
     await t.pumpAndSettle();
-    expect(find.widgetWithText(TextField, 'NICU'), findsOneWidget);
-    expect(find.byType(ActionChip), findsNothing);
+    expect(t.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'الخدج')).selected, isTrue);
+  });
+
+  testWidgets('equipment records a purchase and an issue to a department', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Equipment');
+    final e = store.equipment.first;
+    final before = e.nowQty;
+    await t.tap(find.text('Purchase').first);
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Quantity'), '3');
+    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(store.equipment.first.nowQty, before + 3);
+    await t.tap(find.widgetWithIcon(FilledButton, Icons.outbox_outlined).first);
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Quantity'), '2');
+    await t.tap(find.widgetWithText(ChoiceChip, 'NICU'));
+    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(store.equipment.first.nowQty, before + 1);
+    expect(store.equipment.first.moves.last.party, 'NICU');
+    expect(t.takeException(), isNull);
   });
 
   testWidgets('invoice for a new client takes stock out and records a payment', (t) async {
@@ -225,15 +253,15 @@ void main() {
     store.setOpenMonthStart('2026-09-01');
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
     await go(t, 'Month');
-    expect(find.text('Since 1 Sep 2026'), findsOneWidget);
+    expect(find.text('9/2026'), findsOneWidget);
     await t.tap(find.text('Close month & start new'));
     await t.pumpAndSettle();
     expect(find.text('1 Sep 2026 – 30 Sep 2026'), findsOneWidget);
     await t.tap(find.widgetWithText(FilledButton, 'Close month'));
     await t.pumpAndSettle();
     expect(store.monthCloses.single.from, '2026-09-01');
-    expect(find.text('September 2026'), findsOneWidget);
-    expect(find.text('Since 1 Oct 2026'), findsOneWidget);
+    expect(find.text('9/2026'), findsWidgets);
+    expect(find.text('10/2026'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 

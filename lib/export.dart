@@ -11,11 +11,7 @@ List<String> lastMonths(DateTime end, [int n = 12]) => [
       for (var i = n - 1; i >= 0; i--) isoDate(DateTime(end.year, end.month - i)).substring(0, 7),
     ];
 
-String monthLabel(String ym) {
-  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  final m = int.parse(ym.substring(5)) - 1;
-  return '${isAr ? arMonthsShort[m] : names[m]} ${ym.substring(2, 4)}';
-}
+String monthLabel(String ym) => fmtMonth(ym);
 
 /// Average issued per month over the last 3 full months plus this one.
 num avgMonthlyUse(Map<String, num>? byMonth, DateTime now) {
@@ -86,11 +82,17 @@ List<Sheet> workbookSheets(WarehouseStore s, DateTime now) {
         [p.no, p.supplier, p.date, p.amount, p.paid, p.remaining, p.settled ? tx('Paid', 'مسددة') : tx('Owed', 'غير مسددة'), p.details],
     ]),
     Sheet(tx('Surgery equipment', 'معدات العمليات'), [
-      for (final (en, ar) in [('Tool', 'الأداة'), ('Received', 'الاستلام'), ('Start', 'البداية'), ('Bought', 'المشترى'), ('Used', 'المستخدم'),
-        ('Now', 'الآن'), ('Used on', 'تواريخ الاستخدام')]) tx(en, ar),
+      for (final (en, ar) in [('Tool', 'الأداة'), ('Received', 'الاستلام'), ('Start', 'البداية'), ('Bought', 'المشترى'), ('Issued', 'المصروف'),
+        ('Now', 'الآن'), ('Movements', 'الحركات')]) tx(en, ar),
     ], [
       for (final e in s.equipment)
-        [e.name, e.dateReceived, e.startQty, e.boughtQty, e.usedQty, e.nowQty, e.usageDates.join(', ')],
+        [
+          e.name, e.dateReceived, e.startQty, e.bought, e.issued, e.nowQty,
+          [
+            ...e.usageDates,
+            for (final m in e.moves) '${m.isBuy ? '+' : '-'}${fmtQty(m.qty)} ${m.date}${m.party == null ? '' : ' ${m.party}'}',
+          ].join(', '),
+        ],
     ]),
     Sheet(tx('Expiry dates', 'تواريخ الانتهاء'), [
       for (final (en, ar) in [('Code', 'الرمز'), ('Item', 'المادة'), ('Unit', 'الوحدة'), ('Expiry date', 'تاريخ الانتهاء'), ('Quantity', 'الكمية'),

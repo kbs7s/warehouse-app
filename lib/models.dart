@@ -252,18 +252,35 @@ class Payment {
 }
 
 /// Durable surgery tools (sheet Store). Each use is recorded as a date.
+/// One purchase or issue of a surgery tool.
+class EquipmentMove {
+  EquipmentMove({required this.date, required this.qty, required this.kind, this.party});
+  String date;
+  num qty;
+  String kind; // 'buy' or 'issue'
+  String? party; // supplier for a purchase, department for an issue
+
+  bool get isBuy => kind == 'buy';
+
+  factory EquipmentMove.fromJson(Map<String, dynamic> j) => EquipmentMove(
+      date: j['date'] as String, qty: _n(j['qty']), kind: j['kind'] as String, party: j['party'] as String?);
+  Map<String, dynamic> toJson() => {'date': date, 'qty': qty, 'kind': kind, if (party != null) 'party': party};
+}
+
 class Equipment {
-  Equipment({required this.name, this.dateReceived, this.startQty = 0, this.boughtQty = 0, List<String>? usageDates})
-      : usageDates = usageDates ?? [];
+  Equipment({required this.name, this.dateReceived, this.startQty = 0, this.boughtQty = 0, List<String>? usageDates, List<EquipmentMove>? moves})
+      : usageDates = usageDates ?? [],
+        moves = moves ?? [];
   String name;
   String? dateReceived;
   num startQty;
-  num boughtQty;
-  List<String> usageDates;
+  num boughtQty; // bought before purchases were recorded one by one
+  List<String> usageDates; // uses recorded before issues were recorded (one each)
+  List<EquipmentMove> moves;
 
-  // Same as Excel: used = number of usage dates; now = start + bought - used.
-  int get usedQty => usageDates.length;
-  num get nowQty => startQty + boughtQty - usedQty;
+  num get bought => boughtQty + moves.where((m) => m.isBuy).fold<num>(0, (s, m) => s + m.qty);
+  num get issued => usageDates.length + moves.where((m) => !m.isBuy).fold<num>(0, (s, m) => s + m.qty);
+  num get nowQty => startQty + bought - issued;
 
   factory Equipment.fromJson(Map<String, dynamic> j) => Equipment(
         name: j['name'] as String,
@@ -271,9 +288,16 @@ class Equipment {
         startQty: _n(j['startQty']),
         boughtQty: _n(j['boughtQty']),
         usageDates: [for (final d in (j['usageDates'] as List? ?? [])) d as String],
+        moves: [for (final m in (j['moves'] as List? ?? [])) EquipmentMove.fromJson(m as Map<String, dynamic>)],
       );
-  Map<String, dynamic> toJson() =>
-      {'name': name, 'dateReceived': dateReceived, 'startQty': startQty, 'boughtQty': boughtQty, 'usageDates': usageDates};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'dateReceived': dateReceived,
+        'startQty': startQty,
+        'boughtQty': boughtQty,
+        'usageDates': usageDates,
+        if (moves.isNotEmpty) 'moves': [for (final m in moves) m.toJson()],
+      };
 }
 
 /// Monthly issued/stock figures typed into the Excel Year sheet (before the app existed).

@@ -36,7 +36,7 @@ void main() {
     final s = seeded();
     expect(s.payments.fold<num>(0, (t, p) => t + p.remaining), 259759); // تسديد total remaining
     final tool = s.equipment.firstWhere((e) => e.name == 'يدة لكشور تب قصير');
-    expect(tool.usedQty, 3);
+    expect(tool.issued, 3);
     expect(tool.nowQty, 4);
     tool.usageDates.add('2026-10-01');
     s.saveEquipment(tool, index: s.equipment.indexOf(tool));

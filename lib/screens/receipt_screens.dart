@@ -98,17 +98,21 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   late final _note = TextEditingController(text: widget.existing?.note);
   late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? <ReceiptLine>[]) _Line(l.itemId, l.qty)];
 
-  /// Departments for one-tap picking.
-  late final List<String> _recentDepts = () {
-    // Most recently used first, then the rest of the Settings list. Removed departments are left out.
+  /// Departments to pick from: the Settings list, most recently used first.
+  late final List<String> _depts = () {
     final listed = store.departments.toSet();
     final seen = <String>{};
     for (final r in store.receipts.reversed) {
       final d = r.department?.trim() ?? '';
-      if (d.isNotEmpty && (listed.isEmpty || listed.contains(d))) seen.add(d);
+      if (listed.contains(d)) seen.add(d);
       if (seen.length == 8) break;
     }
-    return [...seen, ...(store.departments.where((d) => !seen.contains(d)).toList()..sort())];
+    final old = widget.existing?.department?.trim() ?? '';
+    return [
+      if (old.isNotEmpty && !listed.contains(old)) old, // an older issue to a department since removed
+      ...seen,
+      ...(store.departments.where((d) => !seen.contains(d)).toList()..sort()),
+    ];
   }();
 
   @override
@@ -243,30 +247,26 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
               ),
               SizedBox(
                 width: 260,
-                child: SuggestField(label: tx('Department', 'القسم'), controller: _dept, options: store.departments),
-              ),
-              SizedBox(
-                width: 260,
                 child: SuggestField(label: tx('Received by', 'المستلم'), controller: _person, options: people),
               ),
             ],
           ),
-          if (_dept.text.trim().isEmpty && _recentDepts.isNotEmpty) ...[
-            const SizedBox(height: 10),
+          const SizedBox(height: 16),
+          Text(tx('Department', 'القسم'), style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (_depts.isEmpty)
+            Text(tx('No departments yet. The owner adds them in Settings > Departments.', 'لا توجد أقسام بعد. يضيفها المالك من الإعدادات > الأقسام.'))
+          else
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final d in _recentDepts)
-                ActionChip(
+              for (final d in _depts)
+                ChoiceChip(
                   avatar: const Icon(Icons.local_hospital_outlined, size: 18),
                   label: NameText(d),
-                  onPressed: () => _dept.text = d,
+                  selected: _dept.text.trim() == d,
+                  showCheckmark: false,
+                  onSelected: (_) => _dept.text = d,
                 ),
             ]),
-          ],
-          const SizedBox(height: 16),
-          TextField(
-            controller: _note,
-            decoration: InputDecoration(labelText: tx('Note', 'ملاحظة'), border: const OutlineInputBorder()),
-          ),
           const SizedBox(height: 24),
           Row(
             children: [

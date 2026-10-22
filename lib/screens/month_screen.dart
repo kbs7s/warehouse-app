@@ -20,7 +20,7 @@ String _monthName(String iso) {
 String monthTitle(String from, String to) {
   final a = DateTime.parse(from), b = DateTime.parse(to);
   final whole = a.day == 1 && a.year == b.year && a.month == b.month && DateTime(b.year, b.month, b.day + 1).month != b.month;
-  return whole ? _monthName(from) : '${fmtDate(from)} – ${fmtDate(to)}';
+  return whole || fmtMonth(from) == fmtMonth(to) ? fmtMonth(from) : '${fmtMonth(from)} – ${fmtMonth(to)}';
 }
 
 num _sum(Iterable<num> v) => v.fold<num>(0, (a, b) => a + b);
@@ -180,7 +180,7 @@ class _OpenMonthCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(tx('Open month', 'الشهر المفتوح'), style: t.textTheme.labelLarge!.copyWith(color: Colors.white70)),
         const SizedBox(height: 4),
-        Text(tx('Since ${fmtDate(from)}', 'منذ ${fmtDate(from)}'),
+        Text(fmtMonth(from),
             style: t.textTheme.headlineSmall!.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         Text(
@@ -311,7 +311,7 @@ class ClosedMonthScreen extends StatelessWidget {
               label: tx('Closed on', 'أُغلق في'),
               value: m.closedAt.length >= 10 ? fmtDate(m.closedAt.substring(0, 10)) : '—',
               icon: Icons.event_available,
-              hint: '${fmtDate(m.from)} – ${fmtDate(m.to)}'),
+              hint: monthTitle(m.from, m.to)),
         ]),
         SectionTitle(tx('Items', 'المواد'), trailing: Text('${m.rows.length}')),
         MonthTable(store: store, rows: [...moved, ...m.rows.where((r) => !rowMoved(r))], emptyText: tx('No items.', 'لا توجد مواد.')),

@@ -21,6 +21,8 @@ String fmtDate(String? iso) {
   return isAr ? '${d.day} ${arMonths[d.month - 1]} ${d.year}' : intl.DateFormat('d MMM yyyy').format(d);
 }
 
+/// "10/2026": month number and year only, for month and year pages.
+String fmtMonth(String iso) => '${int.parse(iso.substring(5, 7))}/${iso.substring(0, 4)}';
 String isoDate(DateTime d) => intl.DateFormat('yyyy-MM-dd').format(d);
 String todayIso() => isoDate(DateTime.now());
 
