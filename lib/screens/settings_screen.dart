@@ -13,17 +13,20 @@ import 'cloud_screens.dart';
 import 'departments_screen.dart';
 import 'welcome_screen.dart' show LanguageChips;
 
+/// Saves the whole data set as a JSON file (Files / iCloud Drive on the iPad).
+Future<void> exportBackup(BuildContext context, WarehouseStore store) async {
+  final name = 'warehouse-backup-${todayIso()}.json';
+  store.markBackedUp();
+  await downloadFile(name, utf8.encode(jsonEncode(store.toJson())), 'application/json');
+  if (context.mounted) toast(context, tx('Backup saved as $name. Keep it in Files or iCloud Drive.', 'حُفظت النسخة الاحتياطية باسم $name. احتفظ بها في Files أو iCloud Drive.'));
+}
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.store, this.shell});
   final WarehouseStore store;
   final Shell? shell;
 
-  Future<void> _backup(BuildContext context) async {
-    final name = 'warehouse-backup-${todayIso()}.json';
-    store.markBackedUp();
-    await downloadFile(name, utf8.encode(jsonEncode(store.toJson())), 'application/json');
-    if (context.mounted) toast(context, tx('Backup saved as $name. Keep it in Files or iCloud Drive.', 'حُفظت النسخة الاحتياطية باسم $name. احتفظ بها في Files أو iCloud Drive.'));
-  }
+  Future<void> _backup(BuildContext context) => exportBackup(context, store);
 
   Future<void> _restore(BuildContext context) async {
     final text = await pickTextFile();

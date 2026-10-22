@@ -45,6 +45,25 @@ class WarehouseStore extends ChangeNotifier {
   String themeMode = 'system'; // 'system', 'light' or 'dark'
   int accent = 0; // index into accentChoices
   double textSize = 1.0; // text scale on this device
+  String? backupSnooze; // the backup reminder is hidden until after this date
+
+  /// Days since the last backup export (null: never), and whether the weekly reminder should show.
+  int? get daysSinceBackup {
+    final last = lastBackupAt == null ? null : DateTime.tryParse(lastBackupAt!);
+    return last == null ? null : DateTime.now().difference(last).inDays;
+  }
+
+  bool get backupDue {
+    final d = daysSinceBackup;
+    if (d != null && d < 7) return false;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    return backupSnooze == null || backupSnooze!.compareTo(today) < 0;
+  }
+
+  Future<void> snoozeBackup() async {
+    backupSnooze = DateTime.now().toIso8601String().substring(0, 10);
+    await _saveDevice();
+  }
 
   Map<String, StockInfo> _stock = {};
   Ledger ledger = Ledger.build(items: [], purchases: [], receipts: [], invoices: []);
@@ -78,6 +97,7 @@ class WarehouseStore extends ChangeNotifier {
       themeMode = (j['themeMode'] as String?) ?? 'system';
       accent = (j['accent'] as num?)?.toInt() ?? 0;
       textSize = (j['textSize'] as num?)?.toDouble() ?? 1.0;
+      backupSnooze = j['backupSnooze'] as String?;
     }
   }
 
@@ -96,7 +116,13 @@ class WarehouseStore extends ChangeNotifier {
   Future<void> _saveDevice() async {
     if (_db != null) {
       await _deviceRecord.put(
-          _db, jsonEncode({'lang': lang, 'themeMode': themeMode, 'accent': accent, 'textSize': textSize}));
+          _db, jsonEncode({
+            'lang': lang,
+            'themeMode': themeMode,
+            'accent': accent,
+            'textSize': textSize,
+            if (backupSnooze != null) 'backupSnooze': backupSnooze,
+          }));
     }
     notifyListeners();
   }

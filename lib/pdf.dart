@@ -226,3 +226,105 @@ Future<void> shareInvoicePdf(WarehouseStore store, Invoice inv) => Printing.layo
       name: 'Invoice-${inv.no}.pdf',
       onLayout: (_) => buildInvoicePdf(store, inv),
     );
+
+/// Monthly report: what each department took between [from] and [to] (both included).
+Future<Uint8List> buildDepartmentsPdf(WarehouseStore store, String from, String to, String title) async {
+  final doc = pw.Document(theme: await _pdfTheme(), title: title);
+  const cell = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4);
+  final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold);
+
+  // Department -> item -> quantity, and receipts per department.
+  final qty = <String, Map<String, num>>{};
+  final count = <String, int>{};
+  for (final r in store.receipts) {
+    final d = r.date;
+    if (d == null || d.compareTo(from) < 0 || d.compareTo(to) > 0) continue;
+    final name = (r.department?.trim().isEmpty ?? true) ? tx('No department', 'بدون قسم') : r.department!.trim();
+    count[name] = (count[name] ?? 0) + 1;
+    final m = qty.putIfAbsent(name, () => {});
+    for (final l in r.lines) {
+      m[l.itemId] = (m[l.itemId] ?? 0) + l.qty;
+    }
+  }
+  num total(Map<String, num> m) => m.values.fold<num>(0, (a, b) => a + b);
+  final depts = qty.keys.toList()..sort((a, b) => total(qty[b]!).compareTo(total(qty[a]!)));
+
+  pw.Widget table(List<pw.TableColumnWidth> widths, List<String> header, List<List<pw.Widget>> rows) => pw.Table(
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: .5),
+        columnWidths: _widths(widths),
+        children: [
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            children: _cols([for (final h in header) pw.Padding(padding: cell, child: pw.Text(h, style: bold))]),
+          ),
+          for (final r in rows) pw.TableRow(children: _cols([for (final c in r) pw.Padding(padding: cell, child: c)])),
+        ],
+      );
+
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    textDirection: _dir,
+    margin: const pw.EdgeInsets.all(32),
+    header: (_) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(title, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+        _name(store.companyName.isEmpty ? 'قسم التجهيز' : store.companyName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+      ]),
+      pw.Text(from.startsWith('0000') ? tx('All records', 'كل السجلات') : '${fmtDate(from)} – ${fmtDate(to)}', style: const pw.TextStyle(color: PdfColors.grey700)),
+      pw.Divider(),
+    ]),
+    footer: (c) => pw.Align(
+        alignment: _end,
+        child: pw.Text(tx('Page ${c.pageNumber} of ${c.pagesCount}', 'صفحة ${c.pageNumber} من ${c.pagesCount}'),
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600))),
+    build: (_) => [
+      if (depts.isEmpty)
+        pw.Padding(padding: const pw.EdgeInsets.all(24), child: pw.Text(tx('Nothing was issued in these dates.', 'لا يوجد صرف في هذه التواريخ.')))
+      else ...[
+        pw.Text(tx('Summary', 'الملخص'), style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 6),
+        table(
+          const [pw.FlexColumnWidth(), pw.FixedColumnWidth(70), pw.FixedColumnWidth(70), pw.FixedColumnWidth(80)],
+          [tx('Department', 'القسم'), tx('Receipts', 'الوصولات'), tx('Items', 'المواد'), tx('Quantity', 'الكمية')],
+          [
+            for (final d in depts)
+              [
+                _name(d),
+                pw.Text('${count[d]}', textAlign: _num),
+                pw.Text('${qty[d]!.length}', textAlign: _num),
+                pw.Text(fmtQty(total(qty[d]!)), textAlign: _num),
+              ],
+          ],
+        ),
+        for (final d in depts) ...[
+          pw.SizedBox(height: 18),
+          pw.Row(children: [
+            _name(d, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+            pw.Text('  ·  ${tx('${count[d]} receipts', '${count[d]} وصل')}', style: const pw.TextStyle(color: PdfColors.grey700)),
+          ]),
+          pw.SizedBox(height: 6),
+          table(
+            const [pw.FixedColumnWidth(50), pw.FlexColumnWidth(), pw.FixedColumnWidth(70), pw.FixedColumnWidth(70)],
+            [tx('Code', 'الرمز'), tx('Item', 'المادة'), tx('Qty', 'الكمية'), tx('Unit', 'الوحدة')],
+            [
+              for (final e in (qty[d]!.entries.toList()..sort((a, b) => b.value.compareTo(a.value))))
+                [
+                  pw.Text(e.key),
+                  _name(store.item(e.key)?.name ?? e.key),
+                  pw.Text(fmtQty(e.value), textAlign: _num),
+                  _name(store.item(e.key)?.unit ?? ''),
+                ],
+            ],
+          ),
+        ],
+      ],
+    ],
+  ));
+  return doc.save();
+}
+
+/// Opens the print / share sheet for the department report.
+Future<void> shareDepartmentsPdf(WarehouseStore store, String from, String to, String title) => Printing.layoutPdf(
+      name: '${title.replaceAll('/', '-')}.pdf',
+      onLayout: (_) => buildDepartmentsPdf(store, from, to, title),
+    );

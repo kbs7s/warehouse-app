@@ -119,6 +119,10 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: PageBody(children: [
           const SizedBox(height: 8),
+          if (s.backupDue && !(s.cloud?.isStaff ?? false)) ...[
+            BackupReminder(store: s),
+            const SizedBox(height: 12),
+          ],
           _Hero(
             greeting: _greeting,
             name: s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,
@@ -418,6 +422,50 @@ class InsightTile extends StatelessWidget {
       title: Text(x.title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(x.detail),
       trailing: onTap == null ? null : const Icon(Icons.chevron_right),
+    );
+  }
+}
+
+/// Weekly nudge to export a backup, with the export one tap away.
+class BackupReminder extends StatelessWidget {
+  const BackupReminder({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = store.daysSinceBackup;
+    final t = Theme.of(context);
+    return Card(
+      color: AppColors.warn.withValues(alpha: .14),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Icon(Icons.backup_outlined, color: AppColors.warn),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                    d == null
+                        ? tx('No backup yet', 'لا توجد نسخة احتياطية بعد')
+                        : tx('Last backup $d days ago', 'آخر نسخة احتياطية قبل $d يوم'),
+                    style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700)),
+                Text(tx('Save a copy to Files or iCloud Drive once a week.', 'احفظ نسخة في Files أو iCloud Drive مرة كل أسبوع.'),
+                    style: t.textTheme.bodySmall),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(alignment: WrapAlignment.end, spacing: 4, runSpacing: 4, children: [
+            TextButton(onPressed: store.snoozeBackup, child: Text(tx('Tomorrow', 'غداً'))),
+            FilledButton.icon(
+              onPressed: () => exportBackup(context, store),
+              icon: const Icon(Icons.download),
+              label: Text(tx('Back up now', 'نسخ احتياطي الآن')),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 }

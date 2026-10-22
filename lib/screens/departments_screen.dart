@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../models.dart';
+import '../pdf.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
@@ -42,6 +43,13 @@ class DateSpan {
     return DateSpan(a, b, p);
   }
 
+}
+
+/// "Department report 10/2026" for a whole month, otherwise the dates.
+String reportTitle(DateSpan r) {
+  final whole = r.from.length >= 10 && r.from.substring(8) == '01' && r.to.substring(0, 7) == r.from.substring(0, 7);
+  final span = r.period == Period.allTime ? tx('all time', 'كل الفترات') : whole ? fmtMonth(r.from) : '${fmtDate(r.from)} - ${fmtDate(r.to)}';
+  return tx('Department report $span', 'تقرير الأقسام $span');
 }
 
 class _RangeChips extends StatelessWidget {
@@ -102,7 +110,16 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     final items = {for (final d in all) ...d.qty.keys}.length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Departments', 'الأقسام')), bottom: SubNav.bar(context)),
+      appBar: AppBar(title: Text(tx('Departments', 'الأقسام')), bottom: SubNav.bar(context), actions: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 8),
+          child: TextButton.icon(
+            onPressed: all.isEmpty ? null : () => shareDepartmentsPdf(s, _range.from, _range.to, reportTitle(_range)),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(tx('Report PDF', 'تقرير PDF')),
+          ),
+        ),
+      ]),
       body: PageBody(children: [
         _RangeChips(range: _range, onChanged: (r) => setState(() => _range = r)),
         const SizedBox(height: 14),

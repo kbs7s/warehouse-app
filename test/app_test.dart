@@ -180,7 +180,7 @@ void main() {
       store.saveExpiry('P013', ExpiryBatch(date: isoDate(DateTime.now().add(const Duration(days: 20)))));
       await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
       expect(find.text('Issue to department'), findsOneWidget);
-      expect(find.text('Reorder now'), findsOneWidget);
+      expect(find.text('Reorder now', skipOffstage: false), findsOneWidget);
       for (final (section, pages) in [
         ('Issue', <String>[]),
         ('Stock', ['Items', 'Reorder', 'Expiry', 'Count', 'Reports']),
@@ -571,6 +571,38 @@ void main() {
     expect(pdf.length, greaterThan(10000));
     File('build/invoice-7.pdf').writeAsBytesSync(pdf);
   });
+
+  testWidgets('weekly backup reminder shows on Home until snoozed or backed up', (t) async {
+    ipad(t);
+    store.lastBackupAt = DateTime.now().subtract(const Duration(days: 9)).toIso8601String();
+    expect(store.backupDue, isTrue);
+    await t.pumpWidget(BusinessApp(store: store));
+    await t.pumpAndSettle();
+    expect(find.text('Back up now'), findsOneWidget);
+    await t.tap(find.text('Tomorrow'));
+    await t.pumpAndSettle();
+    expect(find.text('Back up now'), findsNothing);
+    expect(store.backupDue, isFalse);
+    store.backupSnooze = null;
+    store.markBackedUp();
+    expect(store.backupDue, isFalse);
+    store.lastBackupAt = DateTime.now().subtract(const Duration(days: 7)).toIso8601String();
+    expect(store.backupDue, isTrue);
+    expect(t.takeException(), isNull);
+  });
+
+  test('department report PDF builds in English and Arabic', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final en = await buildDepartmentsPdf(store, '0000-01-01', '9999-12-31', 'Department report');
+    expect(en.length, greaterThan(10000));
+    isAr = true;
+    final ar = await buildDepartmentsPdf(store, '0000-01-01', '9999-12-31', 'تقرير الأقسام');
+    isAr = false;
+    expect(ar.length, greaterThan(10000));
+    File('build/departments.pdf')
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(ar);
+  });
 }
 
 String todayIsoForTest() {
@@ -580,4 +612,5 @@ String todayIsoForTest() {
 
 extension<T> on T {
   R let<R>(R Function(T) f) => f(this);
+
 }
