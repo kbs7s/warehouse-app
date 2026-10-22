@@ -261,7 +261,7 @@ class _Hero extends StatelessWidget {
     final phone = isPhone(context);
     final issue = FilledButton.icon(
       style: FilledButton.styleFrom(
-          backgroundColor: Colors.white, foregroundColor: AppColors.brand, minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+          backgroundColor: Colors.white, foregroundColor: appAccent, minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
       onPressed: onIssue,
       icon: const Icon(Icons.outbox_outlined),
       label: Text(tx('Issue to department', 'صرف إلى قسم')),
@@ -277,10 +277,10 @@ class _Hero extends StatelessWidget {
       padding: EdgeInsets.all(phone ? 20 : 28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F766E), Color(0xFF115E59), Color(0xFF134E4A)],
+          colors: heroGradient(),
         ),
         boxShadow: const [BoxShadow(color: Color(0x330F766E), blurRadius: 24, offset: Offset(0, 10))],
       ),

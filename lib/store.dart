@@ -42,6 +42,9 @@ class WarehouseStore extends ChangeNotifier {
   String? source;
   String? lastBackupAt; // when a backup file was last exported
   String lang = 'en'; // interface language on this device: 'en' or 'ar'
+  String themeMode = 'system'; // 'system', 'light' or 'dark'
+  int accent = 0; // index into accentChoices
+  double textSize = 1.0; // text scale on this device
 
   Map<String, StockInfo> _stock = {};
   Ledger ledger = Ledger.build(items: [], purchases: [], receipts: [], invoices: []);
@@ -72,6 +75,9 @@ class WarehouseStore extends ChangeNotifier {
     if (device != null) {
       final j = jsonDecode(device) as Map<String, dynamic>;
       lang = (j['lang'] as String?) ?? 'en';
+      themeMode = (j['themeMode'] as String?) ?? 'system';
+      accent = (j['accent'] as num?)?.toInt() ?? 0;
+      textSize = (j['textSize'] as num?)?.toDouble() ?? 1.0;
     }
   }
 
@@ -80,8 +86,18 @@ class WarehouseStore extends ChangeNotifier {
     await _saveDevice();
   }
 
+  Future<void> setLook({String? mode, int? accentIndex, double? size}) async {
+    themeMode = mode ?? themeMode;
+    accent = accentIndex ?? accent;
+    textSize = size ?? textSize;
+    await _saveDevice();
+  }
+
   Future<void> _saveDevice() async {
-    if (_db != null) await _deviceRecord.put(_db, jsonEncode({'lang': lang}));
+    if (_db != null) {
+      await _deviceRecord.put(
+          _db, jsonEncode({'lang': lang, 'themeMode': themeMode, 'accent': accent, 'textSize': textSize}));
+    }
     notifyListeners();
   }
 

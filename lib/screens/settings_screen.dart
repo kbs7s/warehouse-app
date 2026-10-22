@@ -7,6 +7,7 @@ import '../l10n.dart';
 import '../platform/files.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'cloud_screens.dart';
 import 'departments_screen.dart';
@@ -73,6 +74,8 @@ class SettingsScreen extends StatelessWidget {
             ]),
           ),
         ),
+        const SizedBox(height: 12),
+        AppearanceCard(store: store),
         const SizedBox(height: 12),
         CloudCard(store: store),
         const SizedBox(height: 12),
@@ -211,4 +214,77 @@ class _BusinessCardState extends State<_BusinessCard> {
           ]),
         ),
       );
+}
+
+/// Day/night mode, colour and text size for this device.
+class AppearanceCard extends StatelessWidget {
+  const AppearanceCard({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tx('Appearance', 'المظهر'), style: t.textTheme.titleLarge),
+          Text(tx('Saved on this device only.', 'يُحفظ على هذا الجهاز فقط.'), style: t.textTheme.bodySmall),
+          const SizedBox(height: 14),
+          Text(tx('Mode', 'الوضع'), style: t.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(value: 'light', icon: const Icon(Icons.light_mode_outlined), label: Text(tx('Day', 'نهاري'))),
+              ButtonSegment(value: 'dark', icon: const Icon(Icons.dark_mode_outlined), label: Text(tx('Night', 'ليلي'))),
+              ButtonSegment(value: 'system', icon: const Icon(Icons.brightness_auto_outlined), label: Text(tx('Auto', 'تلقائي'))),
+            ],
+            selected: {store.themeMode},
+            showSelectedIcon: false,
+            onSelectionChanged: (v) => store.setLook(mode: v.first),
+          ),
+          const SizedBox(height: 16),
+          Text(tx('Colour', 'اللون'), style: t.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(spacing: 12, runSpacing: 12, children: [
+            for (final (i, (en, ar, c)) in accentChoices.indexed)
+              Tooltip(
+                message: tx(en, ar),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => store.setLook(accentIndex: i),
+                  child: Semantics(
+                    button: true,
+                    label: tx(en, ar),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: store.accent == i ? t.colorScheme.onSurface : Colors.transparent, width: 3),
+                      ),
+                      child: store.accent == i ? const Icon(Icons.check, color: Colors.white) : null,
+                    ),
+                  ),
+                ),
+              ),
+          ]),
+          const SizedBox(height: 16),
+          Text(tx('Text size', 'حجم الخط'), style: t.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          SegmentedButton<double>(
+            segments: [
+              ButtonSegment(value: 1.0, label: Text(tx('Normal', 'عادي'))),
+              ButtonSegment(value: 1.15, label: Text(tx('Large', 'كبير'))),
+              ButtonSegment(value: 1.3, label: Text(tx('Larger', 'أكبر'))),
+            ],
+            selected: {store.textSize},
+            showSelectedIcon: false,
+            onSelectionChanged: (v) => store.setLook(size: v.first),
+          ),
+        ]),
+      ),
+    );
+  }
 }

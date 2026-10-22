@@ -118,6 +118,8 @@ void main() {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
     await go(t, 'Settings');
+    await t.ensureVisible(find.text('Sales, clients and expenses', skipOffstage: false));
+    await t.pumpAndSettle();
     await t.tap(find.text('Sales, clients and expenses'));
     await t.pumpAndSettle();
     await t.tap(find.widgetWithText(ChoiceChip, 'Invoices'));
@@ -529,6 +531,26 @@ void main() {
     await t.pumpAndSettle();
     expect(store.stock('P001').reserve, 25);
     expect(store.receipts.last.fromReserve, isTrue);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('appearance: night mode, colour and text size are picked in Settings', (t) async {
+    ipad(t);
+    await t.pumpWidget(BusinessApp(store: store));
+    await t.pumpAndSettle();
+    await go(t, 'Settings');
+    await t.tap(find.text('Night'));
+    await t.pumpAndSettle();
+    expect(store.themeMode, 'dark');
+    expect(Theme.of(t.element(find.byType(HomeShell))).brightness, Brightness.dark);
+    await t.tap(find.bySemanticsLabel('Purple'));
+    await t.pumpAndSettle();
+    expect(store.accent, 2);
+    await t.ensureVisible(find.text('Large', skipOffstage: false));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Large'));
+    await t.pumpAndSettle();
+    expect(store.textSize, 1.15);
     expect(t.takeException(), isNull);
   });
 

@@ -160,7 +160,7 @@ class _OpenMonthCard extends StatelessWidget {
     final close = FilledButton.icon(
       style: FilledButton.styleFrom(
           backgroundColor: Colors.white,
-          foregroundColor: AppColors.brand,
+          foregroundColor: appAccent,
           minimumSize: const Size(0, 52),
           textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
       onPressed: () => _closeMonth(context),
@@ -171,10 +171,10 @@ class _OpenMonthCard extends StatelessWidget {
       padding: EdgeInsets.all(phone ? 20 : 26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F766E), Color(0xFF115E59), Color(0xFF134E4A)],
+          colors: heroGradient(),
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

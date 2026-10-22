@@ -36,11 +36,17 @@ class BusinessApp extends StatelessWidget {
         listenable: store,
         builder: (_, _) {
           isAr = store.lang == 'ar';
+          appAccent = accentChoices[store.accent.clamp(0, accentChoices.length - 1)].$3;
           return MaterialApp(
             title: 'Business',
             debugShowCheckedModeBanner: false,
-            theme: buildTheme(Brightness.light),
-            darkTheme: buildTheme(Brightness.dark),
+            theme: buildTheme(Brightness.light, appAccent),
+            darkTheme: buildTheme(Brightness.dark, appAccent),
+            themeMode: switch (store.themeMode) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system },
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(store.textSize)),
+              child: child!,
+            ),
             // Arabic turns the whole layout right-to-left; Western digits are kept in both languages.
             locale: Locale(store.lang),
             supportedLocales: const [Locale('en'), Locale('ar')],

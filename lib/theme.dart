@@ -9,10 +9,32 @@ class AppColors {
   static const info = Color(0xFF2563EB);
 }
 
-ThemeData buildTheme([Brightness brightness = Brightness.light]) {
+/// Colours the user can pick in Settings (English name, Arabic name, colour).
+const accentChoices = <(String, String, Color)>[
+  ('Teal', 'فيروزي', Color(0xFF0F766E)),
+  ('Blue', 'أزرق', Color(0xFF1D4ED8)),
+  ('Purple', 'بنفسجي', Color(0xFF6D28D9)),
+  ('Green', 'أخضر', Color(0xFF15803D)),
+  ('Red', 'أحمر', Color(0xFFBE123C)),
+  ('Orange', 'برتقالي', Color(0xFFC2410C)),
+  ('Brown', 'بني', Color(0xFF7C4A2D)),
+  ('Grey', 'رمادي', Color(0xFF334155)),
+];
+
+/// The colour chosen on this device; set by the app before each build.
+Color appAccent = AppColors.brand;
+
+/// Background of the big coloured cards (home and month), from the chosen colour.
+List<Color> heroGradient() => [
+      appAccent,
+      Color.lerp(appAccent, Colors.black, .18)!,
+      Color.lerp(appAccent, Colors.black, .32)!,
+    ];
+
+ThemeData buildTheme([Brightness brightness = Brightness.light, Color? seed]) {
   final dark = brightness == Brightness.dark;
   final scheme = ColorScheme.fromSeed(
-    seedColor: AppColors.brand,
+    seedColor: seed ?? AppColors.brand,
     brightness: brightness,
     surface: dark ? const Color(0xFF0E1416) : const Color(0xFFF3F6F6),
   );
