@@ -53,7 +53,8 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
                 if (r.customer != null) ...[const Text('  ·  '), Flexible(child: NameText(r.customer!))],
               ],
             ),
-            subtitle: Text(tx('${fmtDate(r.date)}  ·  ${r.lines.length} items', '${fmtDate(r.date)}  ·  ${r.lines.length} مادة')),
+            subtitle: Text(tx('${fmtDate(r.date)}  ·  ${r.lines.length} items', '${fmtDate(r.date)}  ·  ${r.lines.length} مادة') +
+                (r.fromReserve ? tx('  ·  from reserve', '  ·  من الاحتياط') : '')),
             trailing: IconButton(
               tooltip: 'PDF',
               icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -67,9 +68,9 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
   }
 }
 
-void openReceipt(BuildContext context, WarehouseStore store, Receipt? r) => Navigator.of(context).push(
+void openReceipt(BuildContext context, WarehouseStore store, Receipt? r, {bool fromReserve = false}) => Navigator.of(context).push(
   MaterialPageRoute(
-    builder: (_) => ReceiptEditor(store: store, existing: r),
+    builder: (_) => ReceiptEditor(store: store, existing: r, fromReserve: fromReserve),
     fullscreenDialog: true,
   ),
 );
@@ -81,9 +82,10 @@ class _Line {
 }
 
 class ReceiptEditor extends StatefulWidget {
-  const ReceiptEditor({super.key, required this.store, this.existing});
+  const ReceiptEditor({super.key, required this.store, this.existing, this.fromReserve = false});
   final WarehouseStore store;
   final Receipt? existing;
+  final bool fromReserve;
 
   @override
   State<ReceiptEditor> createState() => _ReceiptEditorState();
@@ -93,6 +95,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   late final WarehouseStore store = widget.store;
   late final _no = TextEditingController(text: '${widget.existing?.no ?? store.nextReceiptNo}');
   late String? _date = widget.existing?.date ?? todayIso();
+  late bool _reserve = widget.existing?.fromReserve ?? widget.fromReserve;
   late final _dept = TextEditingController(text: widget.existing?.department);
   late final _person = TextEditingController(text: widget.existing?.customer);
   late final _note = TextEditingController(text: widget.existing?.note);
@@ -123,8 +126,12 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
 
   /// Stock available for this receipt: current stock plus what this receipt already took (when editing).
   num _available(String itemId) {
-    final before = widget.existing?.lines.where((l) => l.itemId == itemId).fold<num>(0, (s, l) => s + l.qty) ?? 0;
-    return store.stock(itemId).qty + before;
+    final ex = widget.existing;
+    final before = ex == null || ex.fromReserve != _reserve
+        ? 0
+        : ex.lines.where((l) => l.itemId == itemId).fold<num>(0, (s, l) => s + l.qty);
+    final st = store.stock(itemId);
+    return (_reserve ? st.reserve : st.qty) + before;
   }
 
   Future<void> _addItem() async {
@@ -147,7 +154,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     }
     if (lines.isEmpty) return _fail(tx('Add at least one item.', 'أضف مادة واحدة على الأقل.'));
     String? t(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
-    return Receipt(no: no, date: _date, department: t(_dept), customer: t(_person), note: t(_note), lines: lines);
+    return Receipt(no: no, date: _date, department: t(_dept), customer: t(_person), note: t(_note), lines: lines, fromReserve: _reserve);
   }
 
   Null _fail(String msg) {
@@ -168,7 +175,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
         !await confirm(
           context,
           tx('Not enough stock', 'المخزون غير كافٍ'),
-          '${tx('These items would go below zero:', 'هذه المواد ستصبح دون الصفر:')}\n\n'
+          '${_reserve ? tx('From the reserve store. ', 'من مخزن الاحتياط. ') : ''}${tx('These items would go below zero:', 'هذه المواد ستصبح دون الصفر:')}\n\n'
           '${over.map(overLine).join('\n')}\n\n'
           '${tx('Save anyway?', 'الحفظ على أي حال؟')}',
           action: tx('Save anyway', 'احفظ على أي حال'),
@@ -190,7 +197,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existing == null
-            ? tx('New issue receipt', 'وصل صرف جديد')
+            ? (_reserve ? tx('Emergency issue (reserve)', 'صرف طارئ من الاحتياط') : tx('New issue receipt', 'وصل صرف جديد'))
             : tx('Receipt #${widget.existing!.no}', 'وصل رقم ${widget.existing!.no}')),
         actions: [
           if (widget.existing != null)
@@ -251,7 +258,15 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _reserve,
+            onChanged: (v) => setState(() => _reserve = v),
+            secondary: Icon(Icons.emergency_outlined, color: _reserve ? Colors.red : null),
+            title: Text(tx('Issue from the reserve store (emergency)', 'صرف من مخزن الاحتياط (طوارئ)')),
+          ),
+          const SizedBox(height: 8),
           Text(tx('Department', 'القسم'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (_depts.isEmpty)

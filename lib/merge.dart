@@ -27,13 +27,14 @@ String _json(Object? v) => jsonEncode(v);
 bool _same(Object? a, Object? b) => _json(a) == _json(b);
 
 const _stringLists = {'departments', 'suppliers'};
-const _numbered = {'receipts', 'purchases', 'payments', 'invoices'};
+const _numbered = {'receipts', 'purchases', 'payments', 'invoices', 'transfers'};
 
 /// What identifies a record in each list. Lists without a natural id use the whole record.
 final Map<String, String Function(Map<String, dynamic>)> _keys = {
   'items': (r) => '${r['id']}',
   'customers': (r) => '${r['name']}',
   'receipts': (r) => '${r['no']}',
+  'transfers': (r) => '${r['no']}',
   'purchases': (r) => '${r['no']}',
   'payments': (r) => '${r['no']}',
   'invoices': (r) => '${r['no']}',

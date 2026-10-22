@@ -181,7 +181,7 @@ void main() {
       expect(find.text('Reorder now'), findsOneWidget);
       for (final (section, pages) in [
         ('Issue', <String>[]),
-        ('Stock', ['Items', 'Reorder', 'Expiry', 'Reports']),
+        ('Stock', ['Items', 'Reorder', 'Expiry', 'Count', 'Reports']),
         ('Purchases', ['Purchases', 'Payments', 'Older bills']),
         ('Month', <String>[]),
         ('Home', <String>[]),
@@ -437,6 +437,100 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  test('reserve store: moves and emergency issues keep the two stores apart', () {
+    final total = store.stock('P001').total, main = store.stock('P001').qty;
+    store.transfer('P001', 100, toReserve: true, date: '2026-10-20');
+    expect(store.stock('P001').reserve, 100);
+    expect(store.stock('P001').qty, main - 100);
+    expect(store.stock('P001').total, total);
+    store.saveReceipt(Receipt(no: 500, date: '2026-10-21', department: 'NICU', lines: [ReceiptLine(itemId: 'P001', qty: 30)], fromReserve: true));
+    expect(store.stock('P001').reserve, 70);
+    expect(store.stock('P001').qty, main - 100);
+    store.transfer('P001', 20, toReserve: false, date: '2026-10-22');
+    expect(store.stock('P001').reserve, 50);
+    expect(store.stock('P001').qty, main - 80);
+    final copy = WarehouseStore(null)..applyJson(jsonDecode(jsonEncode(store.toJson())) as Map<String, dynamic>, save: false);
+    expect(copy.stock('P001').reserve, 50);
+    expect(copy.receipts.last.fromReserve, isTrue);
+  });
+
+  test('stock count issues the shortfall to the chosen departments and adds extras', () {
+    final a = store.stock('P001').qty, b = store.stock('P013').qty, c = store.stock('P005').qty;
+    store.setStockCount(StockCount(started: '2026-10-22', counted: {'P001': a - 10, 'P013': b - 4, 'P005': c + 2}));
+    final made = store.finishStockCount({'P001': 'NICU', 'P013': 'Lab'}, date: '2026-10-22', label: 'Stock count');
+    expect(made, hasLength(2));
+    expect(store.stock('P001').qty, a - 10);
+    expect(store.stock('P013').qty, b - 4);
+    expect(store.stock('P005').qty, c + 2);
+    expect(store.receipts.firstWhere((r) => r.department == 'NICU' && r.note == 'Stock count').lines.single.qty, 10);
+    expect(store.stockCount, isNull);
+  });
+
+  testWidgets('stock count goes item by item and saves the shortfall', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Stock', 'Count');
+    await t.tap(find.text('Start count'));
+    await t.pumpAndSettle();
+    final first = ([...store.activeItems]..sort((a, b) => a.id.compareTo(b.id))).first;
+    final had = store.stock(first.id).qty;
+    expect(find.text(first.name), findsOneWidget);
+    await t.enterText(find.widgetWithText(TextField, 'Counted now'), '${had - 5}');
+    await t.tap(find.text('Next'));
+    await t.pumpAndSettle();
+    expect(store.stockCount!.counted[first.id], had - 5);
+    await t.tap(find.text('Same as app'));
+    await t.pumpAndSettle();
+    expect(find.text('2 of ${store.activeItems.length} counted'), findsOneWidget);
+    await t.tap(find.text('Finish and review differences'));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(ChoiceChip, 'NICU'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Save count'));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(FilledButton, 'Save').last);
+    await t.pumpAndSettle();
+    expect(store.stock(first.id).qty, had - 5);
+    expect(store.receipts.last.department, 'NICU');
+    expect(store.stockCount, isNull);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('reserve page moves stock and opens an emergency issue', (t) async {
+    ipad(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await go(t, 'Reserve');
+    await t.tap(find.text('Move to reserve'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Choose item'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Type part of the item name'), 'اسفنجة');
+    await t.pumpAndSettle();
+    await t.tap(find.text('اسفنجة تعقيم'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Quantity'), '40');
+    await t.tap(find.widgetWithText(FilledButton, 'Move'));
+    await t.pumpAndSettle();
+    expect(store.stock('P001').reserve, 40);
+    expect(find.text('اسفنجة تعقيم'), findsOneWidget);
+    await t.tap(find.text('Emergency issue'));
+    await t.pumpAndSettle();
+    expect(find.text('Emergency issue (reserve)'), findsOneWidget);
+    await t.tap(find.widgetWithText(ChoiceChip, 'NICU'));
+    await t.tap(find.text('Add item'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Type part of the item name'), 'اسفنجة');
+    await t.pumpAndSettle();
+    await t.tap(find.text('اسفنجة تعقيم'));
+    await t.pumpAndSettle();
+    await t.enterText(find.widgetWithText(TextField, 'Qty'), '15');
+    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(store.stock('P001').reserve, 25);
+    expect(store.receipts.last.fromReserve, isTrue);
+    expect(t.takeException(), isNull);
+  });
 
   test('receipt and invoice PDFs build with Arabic names', () async {
     TestWidgetsFlutterBinding.ensureInitialized();

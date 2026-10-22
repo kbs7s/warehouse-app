@@ -94,7 +94,7 @@ class ReceiptLine {
 
 /// An issue of items from the store to a hospital department.
 class Receipt {
-  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines})
+  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false})
       : lines = lines ?? [];
   int no;
   String? date; // yyyy-MM-dd
@@ -102,6 +102,7 @@ class Receipt {
   String? customer;
   String? note;
   List<ReceiptLine> lines;
+  bool fromReserve; // an emergency issue taken from the reserve store
 
   factory Receipt.fromJson(Map<String, dynamic> j) => Receipt(
         no: (j['no'] as num).toInt(),
@@ -110,6 +111,7 @@ class Receipt {
         customer: j['customer'] as String?,
         note: j['note'] as String?,
         lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
+        fromReserve: j['fromReserve'] == true,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -118,7 +120,38 @@ class Receipt {
         'customer': customer,
         'note': note,
         'lines': [for (final l in lines) l.toJson()],
+        if (fromReserve) 'fromReserve': true,
       };
+}
+
+/// Items moved between the main store and the reserve store.
+class Transfer {
+  Transfer({required this.no, required this.date, required this.itemId, required this.qty, required this.toReserve});
+  int no;
+  String date;
+  String itemId;
+  num qty;
+  bool toReserve; // false: back from the reserve to the main store
+
+  factory Transfer.fromJson(Map<String, dynamic> j) => Transfer(
+      no: (j['no'] as num).toInt(),
+      date: j['date'] as String,
+      itemId: j['itemId'] as String,
+      qty: _n(j['qty']),
+      toReserve: j['toReserve'] == true);
+  Map<String, dynamic> toJson() => {'no': no, 'date': date, 'itemId': itemId, 'qty': qty, 'toReserve': toReserve};
+}
+
+/// A stock count in progress: what was counted so far, item by item.
+class StockCount {
+  StockCount({required this.started, Map<String, num>? counted}) : counted = counted ?? {};
+  String started;
+  Map<String, num> counted;
+
+  factory StockCount.fromJson(Map<String, dynamic> j) => StockCount(
+      started: j['started'] as String,
+      counted: {for (final e in (j['counted'] as Map? ?? {}).entries) '${e.key}': _n(e.value)});
+  Map<String, dynamic> toJson() => {'started': started, 'counted': counted};
 }
 
 class PurchaseLine {
@@ -210,13 +243,18 @@ class Purchase {
 enum StockStatus { inStock, low, out }
 
 class StockInfo {
-  StockInfo(this.item, this.bought, this.issued, [this.sold = 0]);
+  StockInfo(this.item, this.bought, this.issued, [this.sold = 0, this.reserve = 0]);
   final Item item;
   final num bought;
-  final num issued; // given to departments (internal use)
+  final num issued; // given to departments (internal use), from either store
   final num sold; // on client invoices
+  final num reserve; // kept in the reserve store
 
-  num get qty => item.openingQty + bought - issued - sold;
+  /// Both stores together.
+  num get total => item.openingQty + bought - issued - sold;
+
+  /// In the main store.
+  num get qty => total - reserve;
 
   // Same rule as the Excel ALL sheet: above minimum is in stock, 0 or less is out.
   StockStatus get status => qty <= 0

@@ -31,7 +31,7 @@ extension ExpiryBook on WarehouseStore {
     final out = <ExpiryInfo>[];
     for (final i in items) {
       if (!i.active || i.expiries.isEmpty) continue;
-      if (!all && stock(i.id).qty <= 0) continue;
+      if (!all && stock(i.id).total <= 0) continue;
       for (final b in i.expiries) {
         final d = _daysBetween(t, b.date);
         final level = d <= 0

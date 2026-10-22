@@ -4,6 +4,7 @@ import 'insights.dart';
 import 'l10n.dart';
 import 'screens/client_screens.dart';
 import 'screens/cloud_screens.dart';
+import 'screens/count_screen.dart';
 import 'screens/departments_screen.dart';
 import 'screens/equipment_screen.dart';
 import 'screens/expense_screens.dart';
@@ -16,6 +17,7 @@ import 'screens/profit_screen.dart';
 import 'screens/purchase_screens.dart';
 import 'screens/receipt_screens.dart';
 import 'screens/reports_screen.dart';
+import 'screens/reserve_screens.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stock_screen.dart';
 import 'screens/supplier_screens.dart';
@@ -105,6 +107,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
       ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
+      ('Count', 'الجرد', (s, _) => StockCountScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
     ]),
     _Section('Purchases', 'المشتريات', Icons.shopping_cart_outlined, Icons.shopping_cart, [
@@ -115,6 +118,10 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     _Section('Month', 'الشهر', Icons.event_note_outlined, Icons.event_note, [
       ('Month end', 'نهاية الشهر', (s, _) => MonthScreen(store: s)),
     ]),
+    _Section('Reserve', 'الاحتياط', Icons.warehouse_outlined, Icons.warehouse, [
+      ('Reserve store', 'مخزن الاحتياط', (s, _) => ReserveScreen(store: s)),
+      ('Moves', 'النقل', (s, _) => TransfersScreen(store: s)),
+    ], wideOnly: true),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [
       ('Equipment', 'المعدات', (s, _) => EquipmentScreen(store: s)),
     ], wideOnly: true),

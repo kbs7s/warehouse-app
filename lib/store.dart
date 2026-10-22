@@ -26,6 +26,8 @@ class WarehouseStore extends ChangeNotifier {
   List<Customer> customers = [];
   List<String> suppliers = [];
   List<Receipt> receipts = [];
+  List<Transfer> transfers = []; // between the main and reserve stores
+  StockCount? stockCount; // a count in progress
   List<Purchase> purchases = [];
   List<HistoryRow> history = []; // Excel Year sheet, read-only
   List<Equipment> equipment = [];
@@ -99,6 +101,8 @@ class WarehouseStore extends ChangeNotifier {
     customers = [];
     suppliers = [];
     receipts = [];
+    transfers = [];
+    stockCount = null;
     purchases = [];
     history = [];
     equipment = [];
@@ -127,6 +131,8 @@ class WarehouseStore extends ChangeNotifier {
     customers = list('customers').map(Customer.fromJson).toList();
     suppliers = [for (final s in (j['suppliers'] as List? ?? [])) s as String];
     receipts = list('receipts').map(Receipt.fromJson).toList();
+    transfers = list('transfers').map(Transfer.fromJson).toList();
+    stockCount = j['stockCount'] == null ? null : StockCount.fromJson((j['stockCount'] as Map).cast<String, dynamic>());
     purchases = list('purchases').map(Purchase.fromJson).toList();
     history = list('history').map(HistoryRow.fromJson).toList();
     equipment = list('equipment').map(Equipment.fromJson).toList();
@@ -156,6 +162,8 @@ class WarehouseStore extends ChangeNotifier {
         'customers': [for (final c in customers) c.toJson()],
         'suppliers': suppliers,
         'receipts': [for (final r in receipts) r.toJson()],
+        'transfers': [for (final t in transfers) t.toJson()],
+        if (stockCount != null) 'stockCount': stockCount!.toJson(),
         'purchases': [for (final p in purchases) p.toJson()],
         'history': [for (final h in history) h.toJson()],
         'equipment': [for (final e in equipment) e.toJson()],
@@ -187,7 +195,19 @@ class WarehouseStore extends ChangeNotifier {
         if (l.itemId != null) sold[l.itemId!] = (sold[l.itemId!] ?? 0) + l.qty;
       }
     }
-    _stock = {for (final i in items) i.id: StockInfo(i, bought[i.id] ?? 0, issued[i.id] ?? 0, sold[i.id] ?? 0)};
+    final reserve = <String, num>{};
+    for (final t in transfers) {
+      reserve[t.itemId] = (reserve[t.itemId] ?? 0) + (t.toReserve ? t.qty : -t.qty);
+    }
+    for (final r in receipts) {
+      if (!r.fromReserve) continue;
+      for (final l in r.lines) {
+        reserve[l.itemId] = (reserve[l.itemId] ?? 0) - l.qty;
+      }
+    }
+    _stock = {
+      for (final i in items) i.id: StockInfo(i, bought[i.id] ?? 0, issued[i.id] ?? 0, sold[i.id] ?? 0, reserve[i.id] ?? 0)
+    };
     ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
@@ -275,6 +295,53 @@ class WarehouseStore extends ChangeNotifier {
     receipts.add(r);
     receipts.sort((a, b) => a.no.compareTo(b.no));
     _remember(department: r.department, customer: r.customer);
+    _changed();
+  }
+
+  int get nextTransferNo => transfers.fold<int>(0, (m, t) => t.no > m ? t.no : m) + 1;
+
+  /// Moves [qty] of an item to the reserve store, or back to the main store.
+  void transfer(String itemId, num qty, {required bool toReserve, required String date}) {
+    transfers.add(Transfer(no: nextTransferNo, date: date, itemId: itemId, qty: qty, toReserve: toReserve));
+    _changed();
+  }
+
+  void deleteTransfer(int no) {
+    transfers.removeWhere((t) => t.no == no);
+    _changed();
+  }
+
+  /// Ends the stock count. Each item counted short is recorded as issued to the department in [deptFor];
+  /// items counted over are added back as a "Stock count" purchase. Returns the receipts made.
+  List<Receipt> finishStockCount(Map<String, String> deptFor, {required String date, String label = 'Stock count'}) {
+    final c = stockCount;
+    if (c == null) return [];
+    final byDept = <String, List<ReceiptLine>>{};
+    final extra = <PurchaseLine>[];
+    for (final e in c.counted.entries) {
+      final diff = stock(e.key).qty - e.value;
+      if (diff > 0) {
+        final d = deptFor[e.key];
+        if (d == null) continue;
+        (byDept[d] ??= []).add(ReceiptLine(itemId: e.key, qty: diff));
+      } else if (diff < 0) {
+        extra.add(PurchaseLine(itemId: e.key, qty: -diff, total: 0));
+      }
+    }
+    final made = <Receipt>[];
+    for (final e in byDept.entries) {
+      final r = Receipt(no: nextReceiptNo, date: date, department: e.key, note: label, lines: e.value);
+      receipts.add(r);
+      made.add(r);
+    }
+    if (extra.isNotEmpty) purchases.add(Purchase(no: nextPurchaseNo, date: date, supplier: label, note: label, lines: extra));
+    stockCount = null;
+    _changed();
+    return made;
+  }
+
+  void setStockCount(StockCount? c) {
+    stockCount = c;
     _changed();
   }
 
