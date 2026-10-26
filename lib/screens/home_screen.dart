@@ -131,6 +131,7 @@ class HomeScreen extends StatelessWidget {
             trailing: [
               SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
               if (w < 700) ...[
+                    _HeroIcon(Icons.warehouse_outlined, tx('Reserve store', 'مخزن الاحتياط'), () => shell.go('Reserve')),
                     _HeroIcon(Icons.medical_services_outlined, tx('Equipment', 'المعدات'), () => _push(context, EquipmentScreen(store: s))),
                     _HeroIcon(Icons.settings_outlined, tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), () => _push(context, SettingsScreen(store: s))),
               ],

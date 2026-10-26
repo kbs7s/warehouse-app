@@ -457,6 +457,18 @@ void main() {
     expect(copy.receipts.last.fromReserve, isTrue);
   });
 
+  testWidgets('phone: reserve store and its count open from Home', (t) async {
+    phone(t);
+    await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
+    await t.tap(find.byTooltip('Reserve store'));
+    await t.pumpAndSettle();
+    expect(find.text('Move to reserve'), findsOneWidget);
+    await t.tap(find.text('Count'));
+    await t.pumpAndSettle();
+    expect(find.text('Reserve count'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   test('reserve count: shortfall is an emergency issue, extras go into the reserve, main store untouched', () {
     store.transfer('P001', 50, toReserve: true, date: '2026-10-20');
     store.transfer('P013', 10, toReserve: true, date: '2026-10-20');
