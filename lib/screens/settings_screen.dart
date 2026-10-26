@@ -141,7 +141,7 @@ class SettingsScreen extends StatelessWidget {
                       : tx('Last backup: ${fmtDate(store.lastBackupAt)} ($days days ago)',
                           'آخر نسخة احتياطية: ${fmtDate(store.lastBackupAt)} (قبل $days يوم)'),
                   style: TextStyle(
-                      fontWeight: FontWeight.w600, color: days == null || days > 7 ? Colors.red : Colors.green)),
+                      fontWeight: FontWeight.w600, color: days == null || days > 7 ? Theme.of(context).colorScheme.bad : Theme.of(context).colorScheme.good)),
               const SizedBox(height: 16),
               Wrap(spacing: 12, runSpacing: 12, children: [
                 FilledButton.icon(

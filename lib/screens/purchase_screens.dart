@@ -475,7 +475,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
                 children: [
                   SizedBox(
                     width: 32,
-                    child: Text('${i + 1}', style: const TextStyle(color: Colors.grey)),
+                    child: Text('${i + 1}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
                   name,
                   field(l.qty, tx('Qty', 'الكمية'), 100, onChanged: () => _recalc(l)),

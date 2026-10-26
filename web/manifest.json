@@ -1,12 +1,12 @@
 {
-  "name": "Business — قسم التجهيز",
-  "short_name": "Business",
+  "name": "Hospital Store — قسم التجهيز",
+  "short_name": "قسم التجهيز",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#F7F9F9",
+  "background_color": "#F3F6F6",
   "theme_color": "#0F766E",
-  "description": "Invoices, stock cost layers and profit, offline",
+  "description": "Hospital store: issue supplies to departments, stock, purchases and expiry dates. Works offline.",
   "orientation": "any",
   "icons": [
     {

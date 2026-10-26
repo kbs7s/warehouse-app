@@ -5,6 +5,7 @@ import '../models.dart';
 import '../pdf.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'item_picker.dart';
 
@@ -314,7 +315,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
             if (!phone)
               SizedBox(
                 width: 32,
-                child: Text('${i + 1}', style: const TextStyle(color: Colors.grey)),
+                child: Text('${i + 1}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
             Expanded(
               child: Column(
@@ -323,7 +324,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                   NameText(item?.name ?? l.itemId, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                   Text(
                     tx('${l.itemId}  ·  in stock: ${fmtQty(avail)}', '${l.itemId}  ·  الموجود: ${fmtQty(avail)}'),
-                    style: TextStyle(color: avail <= 0 ? Colors.red : Colors.grey.shade700),
+                    style: TextStyle(color: avail <= 0 ? Theme.of(context).colorScheme.bad : Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),

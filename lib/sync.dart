@@ -39,6 +39,8 @@ class CloudSync extends ChangeNotifier {
   String? error;
   DateTime? lastSync;
   String? lastBy; // who saved the online copy last
+  DateTime? _roleChecked;
+  static const roleCheckEvery = Duration(minutes: 5);
 
   String? _baseTime;
   String? _base; // canonical JSON of the last copy this device and the online copy agreed on
@@ -145,6 +147,7 @@ class CloudSync extends ChangeNotifier {
     _debounce?.cancel();
     _client = null;
     member = null;
+    _roleChecked = null;
     _base = null;
     _baseTime = null;
     state = SyncState.off;
@@ -180,11 +183,18 @@ class CloudSync extends ChangeNotifier {
     state = SyncState.working;
     notifyListeners();
     try {
-      if (member == null || member!.email != c.user!.email) {
+      // The role is read again every few minutes, so a change made by the owner (staff made an
+      // owner, or the other way round) reaches devices that are already signed in.
+      final roleStale = _roleChecked == null || DateTime.now().difference(_roleChecked!) > roleCheckEvery;
+      if (member == null || member!.email != c.user!.email || roleStale) {
+        final before = member?.role;
         member = await c.me();
         if (member == null) throw CloudError('PERMISSION_DENIED');
-        await _saveSession();
-        store.refresh(); // the role decides which pages show
+        _roleChecked = DateTime.now();
+        if (member!.role != before) {
+          await _saveSession();
+          store.refresh(); // the role decides which pages show
+        }
       }
       for (var attempt = 0; attempt < 5; attempt++) {
         var local = _snapshot();
