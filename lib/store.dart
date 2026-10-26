@@ -28,6 +28,7 @@ class WarehouseStore extends ChangeNotifier {
   List<Receipt> receipts = [];
   List<Transfer> transfers = []; // between the main and reserve stores
   StockCount? stockCount; // a count in progress
+  StockCount? reserveCount; // a count of the reserve store in progress
   List<Purchase> purchases = [];
   List<HistoryRow> history = []; // Excel Year sheet, read-only
   List<Equipment> equipment = [];
@@ -145,6 +146,7 @@ class WarehouseStore extends ChangeNotifier {
     receipts = [];
     transfers = [];
     stockCount = null;
+    reserveCount = null;
     purchases = [];
     history = [];
     equipment = [];
@@ -175,6 +177,7 @@ class WarehouseStore extends ChangeNotifier {
     receipts = list('receipts').map(Receipt.fromJson).toList();
     transfers = list('transfers').map(Transfer.fromJson).toList();
     stockCount = j['stockCount'] == null ? null : StockCount.fromJson((j['stockCount'] as Map).cast<String, dynamic>());
+    reserveCount = j['reserveCount'] == null ? null : StockCount.fromJson((j['reserveCount'] as Map).cast<String, dynamic>());
     purchases = list('purchases').map(Purchase.fromJson).toList();
     history = list('history').map(HistoryRow.fromJson).toList();
     equipment = list('equipment').map(Equipment.fromJson).toList();
@@ -206,6 +209,7 @@ class WarehouseStore extends ChangeNotifier {
         'receipts': [for (final r in receipts) r.toJson()],
         'transfers': [for (final t in transfers) t.toJson()],
         if (stockCount != null) 'stockCount': stockCount!.toJson(),
+        if (reserveCount != null) 'reserveCount': reserveCount!.toJson(),
         'purchases': [for (final p in purchases) p.toJson()],
         'history': [for (final h in history) h.toJson()],
         'equipment': [for (final e in equipment) e.toJson()],
@@ -355,13 +359,16 @@ class WarehouseStore extends ChangeNotifier {
 
   /// Ends the stock count. Each item counted short is recorded as issued to the department in [deptFor];
   /// items counted over are added back as a "Stock count" purchase. Returns the receipts made.
-  List<Receipt> finishStockCount(Map<String, String> deptFor, {required String date, String label = 'Stock count'}) {
-    final c = stockCount;
+  /// With [reserve] it ends the reserve store's count: the shortfall becomes emergency issues from the
+  /// reserve, and extras are added as a purchase moved straight into the reserve.
+  List<Receipt> finishStockCount(Map<String, String> deptFor, {required String date, String label = 'Stock count', bool reserve = false}) {
+    final c = countOf(reserve: reserve);
     if (c == null) return [];
     final byDept = <String, List<ReceiptLine>>{};
     final extra = <PurchaseLine>[];
     for (final e in c.counted.entries) {
-      final diff = stock(e.key).qty - e.value;
+      final st = stock(e.key);
+      final diff = (reserve ? st.reserve : st.qty) - e.value;
       if (diff > 0) {
         final d = deptFor[e.key];
         if (d == null) continue;
@@ -372,18 +379,27 @@ class WarehouseStore extends ChangeNotifier {
     }
     final made = <Receipt>[];
     for (final e in byDept.entries) {
-      final r = Receipt(no: nextReceiptNo, date: date, department: e.key, note: label, lines: e.value);
+      final r = Receipt(no: nextReceiptNo, date: date, department: e.key, note: label, lines: e.value, fromReserve: reserve);
       receipts.add(r);
       made.add(r);
     }
     if (extra.isNotEmpty) purchases.add(Purchase(no: nextPurchaseNo, date: date, supplier: label, note: label, lines: extra));
-    stockCount = null;
+    if (reserve) {
+      for (final l in extra) {
+        transfers.add(Transfer(no: nextTransferNo, date: date, itemId: l.itemId, qty: l.qty, toReserve: true));
+      }
+      reserveCount = null;
+    } else {
+      stockCount = null;
+    }
     _changed();
     return made;
   }
 
-  void setStockCount(StockCount? c) {
-    stockCount = c;
+  StockCount? countOf({bool reserve = false}) => reserve ? reserveCount : stockCount;
+
+  void setStockCount(StockCount? c, {bool reserve = false}) {
+    reserve ? reserveCount = c : stockCount = c;
     _changed();
   }
 

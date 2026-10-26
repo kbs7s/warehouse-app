@@ -7,10 +7,11 @@ import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
 
-/// Stock count of the main store: one item at a time, then the shortfall is issued to departments.
+/// Stock count of the main store (or the reserve store): one item at a time, then the shortfall is issued to departments.
 class StockCountScreen extends StatefulWidget {
-  const StockCountScreen({super.key, required this.store});
+  const StockCountScreen({super.key, required this.store, this.reserve = false});
   final WarehouseStore store;
+  final bool reserve;
 
   @override
   State<StockCountScreen> createState() => _StockCountScreenState();
@@ -21,7 +22,17 @@ class _StockCountScreenState extends State<StockCountScreen> {
   final _focus = FocusNode();
   int? _i;
 
-  List<Item> get _items => [...widget.store.activeItems]..sort((a, b) => a.id.compareTo(b.id));
+  StockCount? get _count => widget.store.countOf(reserve: widget.reserve);
+
+  /// The reserve count covers the items held in the reserve when it starts.
+  List<Item> get _items {
+    final s = widget.store;
+    if (!widget.reserve) return [...s.activeItems]..sort((a, b) => a.id.compareTo(b.id));
+    final ids = _count?.items ?? [for (final x in s.stockList) if (x.reserve != 0) x.item.id];
+    return [for (final id in ids) ?s.item(id)]..sort((a, b) => a.id.compareTo(b.id));
+  }
+
+  num _inApp(String id) => widget.reserve ? widget.store.stock(id).reserve : widget.store.stock(id).qty;
 
   @override
   void dispose() {
@@ -33,38 +44,49 @@ class _StockCountScreenState extends State<StockCountScreen> {
   void _show(int i) {
     final items = _items;
     _i = i.clamp(0, items.length - 1);
-    final done = widget.store.stockCount?.counted[items[_i!].id];
+    final done = _count?.counted[items[_i!].id];
     _qty.text = done == null ? '' : fmtQty(done).replaceAll(',', '');
     _focus.requestFocus();
   }
 
   void _save(num q) {
     final s = widget.store, items = _items;
-    s.stockCount!.counted[items[_i!].id] = q;
-    s.setStockCount(s.stockCount);
-    final next = [for (var k = _i! + 1; k < items.length; k++) k].where((k) => !s.stockCount!.counted.containsKey(items[k].id)).firstOrNull;
+    final c = _count!;
+    c.counted[items[_i!].id] = q;
+    s.setStockCount(c, reserve: widget.reserve);
+    final next = [for (var k = _i! + 1; k < items.length; k++) k].where((k) => !c.counted.containsKey(items[k].id)).firstOrNull;
     setState(() => next == null ? _i = items.length : _show(next));
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.store, c = s.stockCount, items = _items, t = Theme.of(context);
-    final appBar = AppBar(title: Text(tx('Stock count', 'الجرد')), bottom: SubNav.bar(context));
+    final s = widget.store, c = _count, items = _items, t = Theme.of(context), reserve = widget.reserve;
+    final appBar = AppBar(title: Text(reserve ? tx('Reserve count', 'جرد الاحتياط') : tx('Stock count', 'الجرد')), bottom: SubNav.bar(context));
     if (c == null) {
       return Scaffold(
         appBar: appBar,
         body: PageBody(children: [
           EmptyState(
             icon: Icons.fact_check_outlined,
-            title: tx('Count the main store item by item', 'جرد المخزن الأساسي مادة بمادة'),
-            message: tx(
+            title: reserve
+                ? tx('Count the reserve store item by item', 'جرد مخزن الاحتياط مادة بمادة')
+                : tx('Count the main store item by item', 'جرد المخزن الأساسي مادة بمادة'),
+            message: reserve
+                ? (items.isEmpty
+                    ? tx('Nothing is in the reserve store yet, so there is nothing to count.', 'لا توجد مواد في مخزن الاحتياط بعد، فلا يوجد ما يُجرد.')
+                    : tx(
+                        'You type the quantity in the reserve for each of the ${items.length} items held there, one after another. You can stop and continue later. '
+                            'At the end, whatever is missing is recorded as an emergency issue to the departments you choose.',
+                        'تكتب الكمية الموجودة في الاحتياط لكل مادة من ${items.length} مادة موجودة فيه، واحدة بعد الأخرى. يمكنك التوقف والإكمال لاحقاً. '
+                            'في النهاية يُسجَّل النقص صرفاً طارئاً للأقسام التي تختارها.'))
+                : tx(
                 'You type the quantity on the shelf for each of the ${items.length} items, one after another. You can stop and continue later. '
                     'At the end, whatever is missing is recorded as issued to the departments you choose.',
                 'تكتب الكمية الموجودة على الرف لكل مادة من ${items.length} مادة، واحدة بعد الأخرى. يمكنك التوقف والإكمال لاحقاً. '
                     'في النهاية يُسجَّل النقص كمصروف للأقسام التي تختارها.'),
             action: FilledButton.icon(
-              onPressed: () => setState(() {
-                s.setStockCount(StockCount(started: todayIso()));
+              onPressed: items.isEmpty ? null : () => setState(() {
+                s.setStockCount(StockCount(started: todayIso(), items: reserve ? [for (final i in items) i.id] : null), reserve: reserve);
                 _show(0);
               }),
               icon: const Icon(Icons.play_arrow),
@@ -82,7 +104,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
     final done = c.counted.length;
     final finished = _i! >= items.length;
     final item = finished ? null : items[_i!];
-    final expected = item == null ? 0 : s.stock(item.id).qty;
+    final expected = item == null ? 0 : _inApp(item.id);
 
     return Scaffold(
       appBar: appBar,
@@ -95,7 +117,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
             onPressed: () async {
               if (await confirm(context, tx('Cancel this count?', 'إلغاء هذا الجرد؟'),
                   tx('The numbers typed so far are thrown away. Stock does not change.', 'ستُحذف الأعداد المكتوبة حتى الآن. لن يتغير المخزون.'))) {
-                s.setStockCount(null);
+                s.setStockCount(null, reserve: reserve);
                 setState(() => _i = null);
               }
             },
@@ -161,7 +183,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
           onPressed: done == 0
               ? null
               : () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ListenableBuilder(listenable: s, builder: (_, _) => _CountReview(store: s)))),
+                  builder: (_) => ListenableBuilder(listenable: s, builder: (_, _) => _CountReview(store: s, reserve: reserve)))),
           icon: const Icon(Icons.fact_check_outlined),
           label: Text(tx('Finish and review differences', 'إنهاء ومراجعة الفروقات')),
         ),
@@ -183,8 +205,9 @@ class _StockCountScreenState extends State<StockCountScreen> {
 
 /// Differences between the count and the app; the shortfall is issued to the departments chosen here.
 class _CountReview extends StatefulWidget {
-  const _CountReview({required this.store});
+  const _CountReview({required this.store, this.reserve = false});
   final WarehouseStore store;
+  final bool reserve;
 
   @override
   State<_CountReview> createState() => _CountReviewState();
@@ -196,11 +219,12 @@ class _CountReviewState extends State<_CountReview> {
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.store, c = s.stockCount, t = Theme.of(context);
+    final s = widget.store, reserve = widget.reserve, c = s.countOf(reserve: reserve), t = Theme.of(context);
     if (c == null) return const SizedBox();
+    num inApp(String id) => reserve ? s.stock(id).reserve : s.stock(id).qty;
     final rows = [
       for (final e in c.counted.entries)
-        if (s.item(e.key) != null && s.stock(e.key).qty != e.value) (item: s.item(e.key)!, counted: e.value, diff: s.stock(e.key).qty - e.value),
+        if (s.item(e.key) != null && inApp(e.key) != e.value) (item: s.item(e.key)!, counted: e.value, diff: inApp(e.key) - e.value),
     ]..sort((a, b) => a.item.id.compareTo(b.item.id));
     final short = rows.where((r) => r.diff > 0).toList(), over = rows.where((r) => r.diff < 0).toList();
     String? deptOf(String id) => _dept[id] ?? _all;
@@ -212,7 +236,9 @@ class _CountReviewState extends State<_CountReview> {
             'تم جرد ${c.counted.length} مادة · ${short.length} فيها نقص · ${over.length} فيها زيادة'),
             style: t.textTheme.titleMedium),
         if (short.isNotEmpty) ...[
-          SectionTitle(tx('Missing: issued to departments', 'النقص: يُسجَّل مصروفاً للأقسام')),
+          SectionTitle(reserve
+              ? tx('Missing: emergency issue to departments', 'النقص: يُسجَّل صرفاً طارئاً للأقسام')
+              : tx('Missing: issued to departments', 'النقص: يُسجَّل مصروفاً للأقسام')),
           Text(tx('Department for all', 'القسم للكل'), style: t.textTheme.titleSmall),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -251,7 +277,9 @@ class _CountReviewState extends State<_CountReview> {
           ),
         ],
         if (over.isNotEmpty) ...[
-          SectionTitle(tx('Extra: added to stock', 'الزيادة: تُضاف إلى المخزون')),
+          SectionTitle(reserve
+              ? tx('Extra: added to the reserve', 'الزيادة: تُضاف إلى الاحتياط')
+              : tx('Extra: added to stock', 'الزيادة: تُضاف إلى المخزون')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(children: [
@@ -286,7 +314,7 @@ class _CountReviewState extends State<_CountReview> {
               return;
             }
             final made = s.finishStockCount({for (final r in short) r.item.id: deptOf(r.item.id)!},
-                date: todayIso(), label: tx('Stock count', 'جرد'));
+                date: todayIso(), label: reserve ? tx('Reserve count', 'جرد الاحتياط') : tx('Stock count', 'جرد'), reserve: reserve);
             if (!context.mounted) return;
             Navigator.pop(context);
             toast(context, tx('Count saved: ${made.length} issue receipts made.', 'حُفظ الجرد: أُنشئ ${made.length} وصل صرف.'));

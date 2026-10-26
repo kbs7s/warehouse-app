@@ -120,6 +120,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     ]),
     _Section('Reserve', 'الاحتياط', Icons.warehouse_outlined, Icons.warehouse, [
       ('Reserve store', 'مخزن الاحتياط', (s, _) => ReserveScreen(store: s)),
+      ('Count', 'الجرد', (s, _) => StockCountScreen(key: const ValueKey('reserve-count'), store: s, reserve: true)),
       ('Moves', 'النقل', (s, _) => TransfersScreen(store: s)),
     ], wideOnly: true),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [

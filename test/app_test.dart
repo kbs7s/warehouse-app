@@ -457,6 +457,23 @@ void main() {
     expect(copy.receipts.last.fromReserve, isTrue);
   });
 
+  test('reserve count: shortfall is an emergency issue, extras go into the reserve, main store untouched', () {
+    store.transfer('P001', 50, toReserve: true, date: '2026-10-20');
+    store.transfer('P013', 10, toReserve: true, date: '2026-10-20');
+    final mainA = store.stock('P001').qty, mainB = store.stock('P013').qty;
+    store.setStockCount(StockCount(started: '2026-10-26', items: ['P001', 'P013'], counted: {'P001': 45, 'P013': 12}), reserve: true);
+    expect(store.stockCount, isNull);
+    final copy = WarehouseStore(null)..applyJson(jsonDecode(jsonEncode(store.toJson())) as Map<String, dynamic>, save: false);
+    expect(copy.reserveCount!.items, ['P001', 'P013']);
+    final made = store.finishStockCount({'P001': 'NICU'}, date: '2026-10-26', label: 'Reserve count', reserve: true);
+    expect(made.single.fromReserve, isTrue);
+    expect(store.stock('P001').reserve, 45);
+    expect(store.stock('P013').reserve, 12);
+    expect(store.stock('P001').qty, mainA);
+    expect(store.stock('P013').qty, mainB);
+    expect(store.reserveCount, isNull);
+  });
+
   test('stock count issues the shortfall to the chosen departments and adds extras', () {
     final a = store.stock('P001').qty, b = store.stock('P013').qty, c = store.stock('P005').qty;
     store.setStockCount(StockCount(started: '2026-10-22', counted: {'P001': a - 10, 'P013': b - 4, 'P005': c + 2}));

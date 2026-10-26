@@ -144,14 +144,16 @@ class Transfer {
 
 /// A stock count in progress: what was counted so far, item by item.
 class StockCount {
-  StockCount({required this.started, Map<String, num>? counted}) : counted = counted ?? {};
+  StockCount({required this.started, Map<String, num>? counted, this.items}) : counted = counted ?? {};
   String started;
   Map<String, num> counted;
+  List<String>? items; // the items to count, fixed when the count starts (reserve count); null = every item
 
   factory StockCount.fromJson(Map<String, dynamic> j) => StockCount(
       started: j['started'] as String,
-      counted: {for (final e in (j['counted'] as Map? ?? {}).entries) '${e.key}': _n(e.value)});
-  Map<String, dynamic> toJson() => {'started': started, 'counted': counted};
+      counted: {for (final e in (j['counted'] as Map? ?? {}).entries) '${e.key}': _n(e.value)},
+      items: (j['items'] as List?)?.map((e) => '$e').toList());
+  Map<String, dynamic> toJson() => {'started': started, 'counted': counted, if (items != null) 'items': items};
 }
 
 class PurchaseLine {
