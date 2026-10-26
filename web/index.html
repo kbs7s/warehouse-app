@@ -4,24 +4,30 @@
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Hospital warehouse issues and stock">
+  <meta name="description" content="Hospital store: issue supplies to departments, stock, purchases and expiry dates">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Business">
-  <meta name="theme-color" content="#00796B">
+  <meta name="apple-mobile-web-app-title" content="قسم التجهيز">
+  <meta name="theme-color" content="#F3F6F6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E1416" media="(prefers-color-scheme: dark)">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
-  <title>Business</title>
+  <title>Hospital Store · قسم التجهيز</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    body { margin: 0; background: #F4FBF9; }
+    /* Same colours as the app, so opening it does not flash a different page (also at night). */
+    body { margin: 0; background: #F3F6F6; }
     #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-               font: 18px -apple-system, sans-serif; color: #00796B; }
+               font: 600 17px -apple-system, system-ui, sans-serif; color: #0F766E; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0E1416; }
+      #loading { color: #5EEAD4; }
+    }
   </style>
 </head>
 <body>
-  <div id="loading">Loading warehouse…</div>
+  <div id="loading">جارٍ التحميل… · Loading…</div>
   <script>
     // Offline support: sw.js caches the whole app after the first visit.
     if ('serviceWorker' in navigator) {

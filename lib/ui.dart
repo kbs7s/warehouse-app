@@ -55,15 +55,16 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final (label, color) = switch (status) {
-      StockStatus.inStock => (tx('In stock', 'متوفر'), Colors.green),
-      StockStatus.low => (tx('Low', 'منخفض'), Colors.orange),
-      StockStatus.out => (tx('Out', 'نفد'), Colors.red),
+      StockStatus.inStock => (tx('In stock', 'متوفر'), cs.good),
+      StockStatus.low => (tx('Low', 'منخفض'), cs.warning),
+      StockStatus.out => (tx('Out', 'نفد'), cs.bad),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(color: color.withValues(alpha: .14), borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(color: color.shade800, fontWeight: FontWeight.w600, fontSize: 13)),
+      child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
     );
   }
 }

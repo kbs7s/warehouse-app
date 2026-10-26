@@ -38,7 +38,7 @@ class BusinessApp extends StatelessWidget {
           isAr = store.lang == 'ar';
           appAccent = accentChoices[store.accent.clamp(0, accentChoices.length - 1)].$3;
           return MaterialApp(
-            title: 'Business',
+            title: 'Hospital Store',
             debugShowCheckedModeBanner: false,
             theme: buildTheme(Brightness.light, appAccent),
             darkTheme: buildTheme(Brightness.dark, appAccent),
