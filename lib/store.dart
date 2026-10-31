@@ -337,6 +337,7 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void saveReceipt(Receipt r, {int? replacingNo}) {
+    r.by = cloud?.who ?? r.by;
     receipts.removeWhere((x) => x.no == (replacingNo ?? r.no));
     receipts.add(r);
     receipts.sort((a, b) => a.no.compareTo(b.no));
@@ -409,6 +410,7 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void savePurchase(Purchase p, {int? replacingNo}) {
+    p.by = cloud?.who ?? p.by;
     final old = purchases.where((x) => x.no == (replacingNo ?? p.no)).firstOrNull;
     if (old != null) _purchaseExpiries(old, add: false);
     _purchaseExpiries(p, add: true);

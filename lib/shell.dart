@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'insights.dart';
 import 'l10n.dart';
+import 'changes.dart';
+import 'screens/changes_screen.dart';
 import 'screens/client_screens.dart';
 import 'screens/cloud_screens.dart';
 import 'screens/count_screen.dart';
@@ -147,6 +149,35 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
     ]),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.cloud?.onChanges = _showChanges;
+  }
+
+  @override
+  void dispose() {
+    if (widget.store.cloud?.onChanges == _showChanges) widget.store.cloud?.onChanges = null;
+    super.dispose();
+  }
+
+  /// A notice at the bottom when someone else changed the shared store.
+  void _showChanges(List<StoreChange> found) {
+    if (!mounted || _staff) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.notifications_active_outlined, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(child: Text(changesNotice(found), maxLines: 2, overflow: TextOverflow.ellipsis)),
+        ]),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(label: tx('View', 'عرض'), onPressed: () => openChanges(context, widget.store)),
+      ));
+  }
 
   bool get _staff => widget.store.cloud?.isStaff ?? false;
   List<_Section> get _secs => _staff ? _staffSections : _sections;

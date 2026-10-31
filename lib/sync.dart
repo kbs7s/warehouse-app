@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:sembast/sembast.dart';
 
+import 'changes.dart';
 import 'cloud.dart';
 import 'merge.dart';
 import 'store.dart';
@@ -31,6 +32,8 @@ class CloudSync extends ChangeNotifier {
   final Duration pollEvery;
   static final _sessionRecord = StoreRef<String, String>.main().record('cloud');
   static final _baseRecord = StoreRef<String, String>.main().record('cloudBase');
+  static final _changesRecord = StoreRef<String, String>.main().record('cloudChanges');
+  static const keepChanges = 300;
 
   CloudConfig config;
   CloudClient? _client;
@@ -39,6 +42,15 @@ class CloudSync extends ChangeNotifier {
   String? error;
   DateTime? lastSync;
   String? lastBy; // who saved the online copy last
+
+  /// Changes others made to the shared store, newest first, kept on this device only.
+  List<StoreChange> changes = [];
+  int unread = 0;
+
+  /// Called with the changes just taken over from the online copy (to show a notice).
+  void Function(List<StoreChange>)? onChanges;
+  Map<String, String> _names = {}; // email -> name, for "who did it"
+  String? _seen; // the online copy last listed, while a save of ours is retried after a conflict
 
   String? _baseTime;
   String? _base; // canonical JSON of the last copy this device and the online copy agreed on
@@ -50,6 +62,9 @@ class CloudSync extends ChangeNotifier {
   bool get signedIn => _client?.user != null;
   String? get email => _client?.user?.email;
   bool get isOwner => member?.isOwner ?? false;
+
+  /// How this device's user is named on the records they save.
+  String? get who => !signedIn ? null : ((member?.name.isNotEmpty ?? false) ? member!.name : email);
 
   /// Signed in as a team member who is not an owner: may only issue supplies.
   bool get isStaff => signedIn && !isOwner;
@@ -67,6 +82,12 @@ class CloudSync extends ChangeNotifier {
       final b = jsonDecode(base) as Map<String, dynamic>;
       _baseTime = b['updateTime'] as String?;
       _base = b['data'] as String?;
+    }
+    final log = _db == null ? null : await _changesRecord.get(_db);
+    if (log != null) {
+      final l = jsonDecode(log) as Map<String, dynamic>;
+      changes = [for (final c in l['changes'] as List) StoreChange.fromJson(c as Map<String, dynamic>)];
+      unread = (l['unread'] as num?)?.toInt() ?? 0;
     }
     final mail = j['email'] as String?, token = j['refreshToken'] as String?;
     if (mail == null || token == null) return;
@@ -147,10 +168,13 @@ class CloudSync extends ChangeNotifier {
     member = null;
     _base = null;
     _baseTime = null;
+    changes = [];
+    unread = 0;
     state = SyncState.off;
     if (_db != null) {
       await _sessionRecord.delete(_db);
       await _baseRecord.delete(_db);
+      await _changesRecord.delete(_db);
     }
     await store.eraseAll();
     notifyListeners();
@@ -214,6 +238,7 @@ class CloudSync extends ChangeNotifier {
           } else {
             lastBy = remote.updatedBy;
             final changedHere = _base == null || _canon(local) != _base;
+            await _noteChanges(remote);
             if (!changedHere) {
               _apply(remote.data);
               await _setBase(remote.updateTime, _snapshot());
@@ -237,6 +262,44 @@ class CloudSync extends ChangeNotifier {
       state = e.code == 'OFFLINE' ? SyncState.offline : SyncState.error;
       notifyListeners();
     }
+  }
+
+  /// Lists what others changed online since this device last agreed with the online copy.
+  Future<void> _noteChanges(RemoteData remote) async {
+    if (_base == null) return;
+    final before = jsonDecode(_seen ?? _base!) as Map<String, dynamic>;
+    // Read through the app's own model, as the base was, so that fields written differently
+    // (by another app version, say) are not taken for changes.
+    final after = (WarehouseStore(null)..applyJson(remote.data, save: false)).toJson()..remove('savedAt');
+    _seen = jsonEncode(after);
+    final by = remote.updatedBy ?? '';
+    if (by.isNotEmpty && !_names.containsKey(by)) {
+      try {
+        _names = {for (final m in await _client!.members()) m.email: m.name.isEmpty ? m.email : m.name};
+      } on CloudError {
+        // Names are a nicety: show the email instead.
+      }
+    }
+    final found = findChanges(before, after, by: _names[by] ?? by);
+    if (found.isEmpty) return;
+    changes = [...found, ...changes].take(keepChanges).toList();
+    unread += found.length;
+    await _saveChanges();
+    onChanges?.call(found);
+    notifyListeners();
+  }
+
+  /// The Changes list was looked at.
+  Future<void> markRead() async {
+    if (unread == 0) return;
+    unread = 0;
+    await _saveChanges();
+    notifyListeners();
+  }
+
+  Future<void> _saveChanges() async {
+    if (_db == null) return;
+    await _changesRecord.put(_db, jsonEncode({'unread': unread, 'changes': [for (final c in changes) c.toJson()]}));
   }
 
   void _done() {
@@ -280,6 +343,7 @@ class CloudSync extends ChangeNotifier {
   Future<void> _setBase(String updateTime, Map<String, dynamic> data) async {
     _baseTime = updateTime;
     _base = _canon(data);
+    _seen = null;
     if (_db != null) await _baseRecord.put(_db, jsonEncode({'updateTime': _baseTime, 'data': _base}));
   }
 
