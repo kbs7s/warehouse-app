@@ -94,7 +94,7 @@ class ReceiptLine {
 
 /// An issue of items from the store to a hospital department.
 class Receipt {
-  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false})
+  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false, this.by})
       : lines = lines ?? [];
   int no;
   String? date; // yyyy-MM-dd
@@ -103,6 +103,7 @@ class Receipt {
   String? note;
   List<ReceiptLine> lines;
   bool fromReserve; // an emergency issue taken from the reserve store
+  String? by; // who saved it last, when signed in to the shared store
 
   factory Receipt.fromJson(Map<String, dynamic> j) => Receipt(
         no: (j['no'] as num).toInt(),
@@ -112,6 +113,7 @@ class Receipt {
         note: j['note'] as String?,
         lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
         fromReserve: j['fromReserve'] == true,
+        by: j['by'] as String?,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -121,6 +123,7 @@ class Receipt {
         'note': note,
         'lines': [for (final l in lines) l.toJson()],
         if (fromReserve) 'fromReserve': true,
+        if (by != null) 'by': by,
       };
 }
 
@@ -201,7 +204,7 @@ class PurchasePaid {
 
 /// Items bought from a supplier.
 class Purchase {
-  Purchase({required this.no, this.date, this.supplier, this.note, this.ref, List<PurchaseLine>? lines, this.paidLog})
+  Purchase({required this.no, this.date, this.supplier, this.note, this.ref, List<PurchaseLine>? lines, this.paidLog, this.by})
       : lines = lines ?? [];
   int no;
   String? date;
@@ -209,6 +212,7 @@ class Purchase {
   String? note;
   String? ref; // the supplier's own invoice number
   List<PurchaseLine> lines;
+  String? by; // who saved it last, when signed in to the shared store
 
   /// Payments made on this purchase. Null for older purchases whose payment was never recorded:
   /// those count as neither paid nor owed.
@@ -230,6 +234,7 @@ class Purchase {
         paidLog: j['paidLog'] == null
             ? null
             : [for (final p in j['paidLog'] as List) PurchasePaid.fromJson(p as Map<String, dynamic>)],
+        by: j['by'] as String?,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -239,6 +244,7 @@ class Purchase {
         if (ref != null) 'ref': ref,
         'lines': [for (final l in lines) l.toJson()],
         if (paidLog != null) 'paidLog': [for (final p in paidLog!) p.toJson()],
+        if (by != null) 'by': by,
       };
 }
 
