@@ -60,7 +60,7 @@ class _MonthScreenState extends State<MonthScreen> {
     final receiptCount = s.receiptsBetween(from, '9999-12-31');
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(tx('Month end', 'نهاية الشهر')),
         bottom: SubNav.bar(context),
         actions: [
@@ -326,10 +326,11 @@ class MonthTable extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        Container(
+          color: AppColors.dark,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: DefaultTextStyle.merge(
-            style: muted.copyWith(fontWeight: FontWeight.w600),
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
             child: Row(children: [
               Expanded(child: Text(tx('Item', 'المادة'))),
               SizedBox(width: 84, child: Text(tx('Start', 'البداية'), textAlign: TextAlign.end)),

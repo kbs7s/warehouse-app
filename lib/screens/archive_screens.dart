@@ -99,7 +99,7 @@ class MonthArchiveScreen extends StatelessWidget {
       years.putIfAbsent(m.from.substring(0, 4), () => []).add(m);
     }
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Archive', 'الأرشيف')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Archive', 'الأرشيف')), bottom: SubNav.bar(context)),
       body: closes.isEmpty
           ? EmptyState(
               icon: Icons.inventory_outlined,
@@ -248,7 +248,7 @@ class _ClosedMonthScreenState extends State<ClosedMonthScreen> {
     final isLast = s.monthCloses.isNotEmpty && identical(s.monthCloses.last, m);
     final moved = m.rows.where(rowMoved).toList();
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(title),
         actions: [
           IconButton(tooltip: tx('Export month to Excel', 'تصدير الشهر إلى إكسل'), icon: const Icon(Icons.table_view_outlined), onPressed: _export),
@@ -486,7 +486,7 @@ class _KeptReceiptScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = receipt;
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(tx('Issue #${r.no}', 'وصل صرف رقم ${r.no}')),
         actions: [
           IconButton(tooltip: tx('Send or print PDF', 'إرسال أو طباعة PDF'), icon: const Icon(Icons.ios_share), onPressed: () => sendReceipt(context, store, r)),
@@ -531,7 +531,7 @@ class _KeptPurchaseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = purchase;
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Purchase #${p.no}', 'شراء رقم ${p.no}'))),
+      appBar: HeaderBar(title: Text(tx('Purchase #${p.no}', 'شراء رقم ${p.no}'))),
       body: PageBody(maxWidth: 760, children: [
         _closedNote(context),
         Card(

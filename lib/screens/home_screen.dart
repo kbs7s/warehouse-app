@@ -278,7 +278,7 @@ class _Hero extends StatelessWidget {
     );
     final purchase = OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white, side: const BorderSide(color: Colors.white70), minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
+          foregroundColor: Colors.white, backgroundColor: Colors.white.withValues(alpha: .12), side: const BorderSide(color: Colors.white54), minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
       onPressed: onPurchase,
       icon: const Icon(Icons.add_shopping_cart),
       label: Text(tx('Record purchase', 'تسجيل شراء')),
@@ -478,7 +478,7 @@ class BackupReminder extends StatelessWidget {
           ]),
           const SizedBox(height: 8),
           Wrap(alignment: WrapAlignment.end, spacing: 4, runSpacing: 4, children: [
-            TextButton(onPressed: store.snoozeBackup, child: Text(tx('Tomorrow', 'غداً'))),
+            TextButton(style: TextButton.styleFrom(foregroundColor: t.colorScheme.onSurface), onPressed: store.snoozeBackup, child: Text(tx('Tomorrow', 'غداً'))),
             FilledButton.icon(
               onPressed: () => exportBackup(context, store),
               icon: const Icon(Icons.download),

@@ -42,7 +42,7 @@ class _SupplierPaymentsScreenState extends State<SupplierPaymentsScreen> {
     ].fold<num>(0, (a, b) => a + b);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Payments', 'التسديد')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Payments', 'التسديد')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => recordSupplierPayment(context, s),
         icon: const Icon(Icons.payments_outlined),
@@ -117,7 +117,7 @@ class SupplierAccountScreen extends StatelessWidget {
     final bills = [for (final b in store.payments) if ((b.supplier ?? '') == supplier) b];
 
     return Scaffold(
-      appBar: AppBar(title: NameText(supplier.isEmpty ? tx('No supplier', 'بدون مجهز') : supplier)),
+      appBar: HeaderBar(title: NameText(supplier.isEmpty ? tx('No supplier', 'بدون مجهز') : supplier)),
       floatingActionButton: owed > 0
           ? FloatingActionButton.extended(
               onPressed: () => recordSupplierPayment(context, store, supplier: supplier),

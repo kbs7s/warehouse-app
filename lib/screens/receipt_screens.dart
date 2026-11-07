@@ -35,7 +35,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Issues to departments', 'الصرف إلى الأقسام')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Issues to departments', 'الصرف إلى الأقسام')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openReceipt(context, store, null),
         icon: const Icon(Icons.add),
@@ -202,7 +202,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
         if (_dept.text.trim().isEmpty || c.department == _dept.text.trim()) c.name,
     ];
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(widget.existing == null
             ? (_reserve ? tx('Emergency issue (reserve)', 'صرف طارئ من الاحتياط') : tx('New issue receipt', 'وصل صرف جديد'))
             : tx('Receipt #${widget.existing!.no}', 'وصل رقم ${widget.existing!.no}')),

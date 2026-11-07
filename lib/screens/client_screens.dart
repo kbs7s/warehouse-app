@@ -32,7 +32,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       });
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Clients', 'الزبائن')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Clients', 'الزبائن')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => editClient(context, s, null),
         icon: const Icon(Icons.person_add_alt),
@@ -113,7 +113,7 @@ class ClientDetail extends StatelessWidget {
     final contact = [?c.phone, ?c.email, ?c.address];
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: NameText(c.name),
         actions: [
           IconButton(tooltip: tx('Edit', 'تعديل'), icon: const Icon(Icons.edit_outlined), onPressed: () => editClient(context, store, c)),

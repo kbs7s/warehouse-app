@@ -131,7 +131,7 @@ class _CloudSignInScreenState extends State<CloudSignInScreen> {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_setup ? tx('Set up shared store', 'إعداد المخزن المشترك') : tx('Sign in', 'تسجيل الدخول'))),
+      appBar: HeaderBar(title: Text(_setup ? tx('Set up shared store', 'إعداد المخزن المشترك') : tx('Sign in', 'تسجيل الدخول'))),
       body: PageBody(maxWidth: 520, children: [
         Card(
           child: Padding(
@@ -373,7 +373,7 @@ class _TeamScreenState extends State<TeamScreen> {
     final me = widget.store.cloud!.email;
     final list = _members;
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Team', 'الفريق'))),
+      appBar: HeaderBar(title: Text(tx('Team', 'الفريق'))),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _add,
         icon: const Icon(Icons.person_add_alt),
@@ -506,7 +506,7 @@ class AccountScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tx('Account', 'الحساب'))),
+        appBar: HeaderBar(title: Text(tx('Account', 'الحساب'))),
         body: PageBody(maxWidth: 720, children: [
           Card(
             child: Padding(
