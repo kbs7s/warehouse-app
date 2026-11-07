@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'insights.dart';
 import 'l10n.dart';
 import 'changes.dart';
+import 'screens/archive_screens.dart';
 import 'screens/changes_screen.dart';
 import 'screens/client_screens.dart';
 import 'screens/cloud_screens.dart';
@@ -31,6 +32,10 @@ class SubNav extends InheritedWidget {
   final List<String> labels;
   final int index;
   final ValueChanged<int> onSelect;
+
+  /// Switches to another page of the current section (no effect outside a section).
+  static void select(BuildContext context, int index) =>
+      context.getInheritedWidgetOfExactType<SubNav>()?.onSelect(index);
 
   /// The chips row for the current page's AppBar `bottom`, or null outside a section.
   static PreferredSizeWidget? bar(BuildContext context) {
@@ -109,8 +114,12 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
       ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
-      ('Count', 'الجرد', (s, _) => StockCountScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
+    ]),
+    // Stock counts of both stores, each on its own page.
+    _Section('Count', 'الجرد', Icons.fact_check_outlined, Icons.fact_check, [
+      ('Main store', 'المخزن الأساسي', (s, _) => StockCountScreen(store: s)),
+      ('Reserve store', 'مخزن الاحتياط', (s, _) => StockCountScreen(key: const ValueKey('reserve-count'), store: s, reserve: true)),
     ]),
     _Section('Purchases', 'المشتريات', Icons.shopping_cart_outlined, Icons.shopping_cart, [
       ('Purchases', 'قوائم الشراء', (s, _) => PurchasesScreen(store: s)),
@@ -119,10 +128,10 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     ]),
     _Section('Month', 'الشهر', Icons.event_note_outlined, Icons.event_note, [
       ('Month end', 'نهاية الشهر', (s, _) => MonthScreen(store: s)),
+      ('Archive', 'الأرشيف', (s, _) => MonthArchiveScreen(store: s)),
     ]),
     _Section('Reserve', 'الاحتياط', Icons.warehouse_outlined, Icons.warehouse, [
       ('Reserve store', 'مخزن الاحتياط', (s, _) => ReserveScreen(store: s)),
-      ('Count', 'الجرد', (s, _) => StockCountScreen(key: const ValueKey('reserve-count'), store: s, reserve: true)),
       ('Moves', 'النقل', (s, _) => TransfersScreen(store: s)),
     ], wideOnly: true),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [

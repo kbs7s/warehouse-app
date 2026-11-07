@@ -15,6 +15,8 @@ class Item {
     this.note,
     this.salePrice,
     this.openingUnitCost,
+    this.openingReserve = 0,
+    this.reserveOnly = false,
     List<ExpiryBatch>? expiries,
   }) : expiries = expiries ?? [];
 
@@ -29,6 +31,8 @@ class Item {
   num? salePrice; // usual selling price, suggested on invoices (IQD)
   num? openingUnitCost; // cost of each unit of opening stock; null = use the first purchase price
   List<ExpiryBatch> expiries; // expiry dates of the stock on hand, entered by hand
+  num openingReserve; // part of openingQty that starts in the reserve (emergency) store
+  bool reserveOnly; // kept only in the reserve store: hidden from the main store's lists and count
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         id: j['id'] as String,
@@ -41,6 +45,8 @@ class Item {
         note: j['note'] as String?,
         salePrice: j['salePrice'] as num?,
         openingUnitCost: j['openingUnitCost'] as num?,
+        openingReserve: _n(j['openingReserve']),
+        reserveOnly: j['reserveOnly'] == true,
         expiries: [for (final e in (j['expiries'] as List? ?? [])) ExpiryBatch.fromJson(e as Map<String, dynamic>)],
       );
 
@@ -55,6 +61,8 @@ class Item {
         'note': note,
         'salePrice': salePrice,
         'openingUnitCost': openingUnitCost,
+        if (openingReserve != 0) 'openingReserve': openingReserve,
+        if (reserveOnly) 'reserveOnly': true,
         if (expiries.isNotEmpty) 'expiries': [for (final e in expiries) e.toJson()],
       };
 }
@@ -204,7 +212,7 @@ class PurchasePaid {
 
 /// Items bought from a supplier.
 class Purchase {
-  Purchase({required this.no, this.date, this.supplier, this.note, this.ref, List<PurchaseLine>? lines, this.paidLog, this.by})
+  Purchase({required this.no, this.date, this.supplier, this.note, this.ref, List<PurchaseLine>? lines, this.paidLog, this.by, this.toReserve = false})
       : lines = lines ?? [];
   int no;
   String? date;
@@ -213,6 +221,7 @@ class Purchase {
   String? ref; // the supplier's own invoice number
   List<PurchaseLine> lines;
   String? by; // who saved it last, when signed in to the shared store
+  bool toReserve; // what was bought goes straight into the reserve (emergency) store
 
   /// Payments made on this purchase. Null for older purchases whose payment was never recorded:
   /// those count as neither paid nor owed.
@@ -235,6 +244,7 @@ class Purchase {
             ? null
             : [for (final p in j['paidLog'] as List) PurchasePaid.fromJson(p as Map<String, dynamic>)],
         by: j['by'] as String?,
+        toReserve: j['toReserve'] == true,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -245,6 +255,7 @@ class Purchase {
         'lines': [for (final l in lines) l.toJson()],
         if (paidLog != null) 'paidLog': [for (final p in paidLog!) p.toJson()],
         if (by != null) 'by': by,
+        if (toReserve) 'toReserve': true,
       };
 }
 
@@ -258,7 +269,7 @@ class StockInfo {
   final num sold; // on client invoices
   final num reserve; // kept in the reserve store
 
-  /// Both stores together.
+  /// Both stores together. (The item's opening quantity already includes its opening reserve.)
   num get total => item.openingQty + bought - issued - sold;
 
   /// In the main store.
@@ -274,13 +285,16 @@ class StockInfo {
 
 /// A supplier invoice and how much of it has been paid (sheet تسديد).
 class Payment {
-  Payment({required this.no, this.supplier, this.date, this.amount = 0, this.paid = 0, this.details});
+  Payment({required this.no, this.supplier, this.date, this.amount = 0, this.paid = 0, this.details, this.carriedFrom});
   int no;
   String? supplier;
   String? date;
   num amount;
   num paid;
   String? details;
+  /// Set on an unpaid purchase carried over when its month was closed: the start of that month.
+  /// These still count as owed to the supplier and are settled by "Record payment".
+  String? carriedFrom;
 
   num get remaining => amount - paid;
   bool get settled => remaining <= 0;
@@ -292,9 +306,17 @@ class Payment {
         amount: _n(j['amount']),
         paid: _n(j['paid']),
         details: j['details'] as String?,
+        carriedFrom: j['carriedFrom'] as String?,
       );
-  Map<String, dynamic> toJson() =>
-      {'no': no, 'supplier': supplier, 'date': date, 'amount': amount, 'paid': paid, 'details': details};
+  Map<String, dynamic> toJson() => {
+        'no': no,
+        'supplier': supplier,
+        'date': date,
+        'amount': amount,
+        'paid': paid,
+        'details': details,
+        if (carriedFrom != null) 'carriedFrom': carriedFrom,
+      };
 }
 
 /// Durable surgery tools (sheet Store). Each use is recorded as a date.

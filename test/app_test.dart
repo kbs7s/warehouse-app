@@ -183,9 +183,10 @@ void main() {
       expect(find.text('Reorder now', skipOffstage: false), findsOneWidget);
       for (final (section, pages) in [
         ('Issue', <String>[]),
-        ('Stock', ['Items', 'Reorder', 'Expiry', 'Count', 'Reports']),
+        ('Stock', ['Items', 'Reorder', 'Expiry', 'Reports']),
+        ('Count', ['Main store', 'Reserve store']),
         ('Purchases', ['Purchases', 'Payments', 'Older bills']),
-        ('Month', <String>[]),
+        ('Month', ['Month end', 'Archive']),
         ('Home', <String>[]),
       ]) {
         await go(t, section);
@@ -259,11 +260,20 @@ void main() {
     await t.tap(find.text('Close month & start new'));
     await t.pumpAndSettle();
     expect(find.text('1 Sep 2026 – 30 Sep 2026'), findsOneWidget);
+    await t.enterText(find.widgetWithText(TextField, 'Operations'), '120');
     await t.tap(find.widgetWithText(FilledButton, 'Close month'));
     await t.pumpAndSettle();
     expect(store.monthCloses.single.from, '2026-09-01');
-    expect(find.text('9/2026'), findsWidgets);
+    expect(store.monthCloses.single.stats, {'operations': 120});
+    expect(find.text('September 2026'), findsWidgets);
     expect(find.text('10/2026'), findsOneWidget);
+    await t.tap(find.text('All in Archive'));
+    await t.pumpAndSettle();
+    expect(find.text('Figures to fill'), findsOneWidget);
+    await t.tap(find.text('September 2026'));
+    await t.pumpAndSettle();
+    expect(find.text('Hospital figures'), findsOneWidget);
+    expect(find.text('120'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 
@@ -457,13 +467,18 @@ void main() {
     expect(copy.receipts.last.fromReserve, isTrue);
   });
 
-  testWidgets('phone: reserve store and its count open from Home', (t) async {
+  testWidgets('phone: reserve store opens from Home and its count from the Count tab', (t) async {
     phone(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
     await t.tap(find.byTooltip('Reserve store'));
     await t.pumpAndSettle();
     expect(find.text('Move to reserve'), findsOneWidget);
-    await t.tap(find.text('Count'));
+    expect(find.text('Add item to reserve'), findsOneWidget);
+    await t.pageBack();
+    await t.pumpAndSettle();
+    await t.tap(find.text('Count').last);
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(ChoiceChip, 'Reserve store'));
     await t.pumpAndSettle();
     expect(find.text('Reserve count'), findsOneWidget);
     expect(t.takeException(), isNull);
@@ -501,7 +516,7 @@ void main() {
   testWidgets('stock count goes item by item and saves the shortfall', (t) async {
     ipad(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-    await go(t, 'Stock', 'Count');
+    await go(t, 'Count');
     await t.tap(find.text('Start count'));
     await t.pumpAndSettle();
     final first = ([...store.activeItems]..sort((a, b) => a.id.compareTo(b.id))).first;

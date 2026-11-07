@@ -24,7 +24,10 @@ class _SupplierPaymentsScreenState extends State<SupplierPaymentsScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.store;
-    final names = {for (final p in s.purchases) if (p.tracked) p.supplier ?? ''}.toList();
+    final names = {
+      for (final p in s.purchases) if (p.tracked) p.supplier ?? '',
+      for (final b in s.payments) if (b.carriedFrom != null) b.supplier ?? '',
+    }.toList();
     final q = _q.trim().toLowerCase();
     final list = names.where((n) => q.isEmpty || n.toLowerCase().contains(q)).toList()
       ..sort((a, b) {

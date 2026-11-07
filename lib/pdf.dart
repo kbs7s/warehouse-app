@@ -236,7 +236,7 @@ Future<Uint8List> buildDepartmentsPdf(WarehouseStore store, String from, String 
   // Department -> item -> quantity, and receipts per department.
   final qty = <String, Map<String, num>>{};
   final count = <String, int>{};
-  for (final r in store.receipts) {
+  for (final r in store.allReceipts) {
     final d = r.date;
     if (d == null || d.compareTo(from) < 0 || d.compareTo(to) > 0) continue;
     final name = (r.department?.trim().isEmpty ?? true) ? tx('No department', 'بدون قسم') : r.department!.trim();

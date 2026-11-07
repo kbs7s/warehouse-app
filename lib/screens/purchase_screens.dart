@@ -136,9 +136,10 @@ class _Line {
 }
 
 class PurchaseEditor extends StatefulWidget {
-  const PurchaseEditor({super.key, required this.store, this.existing});
+  const PurchaseEditor({super.key, required this.store, this.existing, this.toReserve = false});
   final WarehouseStore store;
   final Purchase? existing;
+  final bool toReserve;
 
   @override
   State<PurchaseEditor> createState() => _PurchaseEditorState();
@@ -158,9 +159,10 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
           ? null
           : [for (final p in widget.existing!.paidLog!) PurchasePaid(amount: p.amount, date: p.date, note: p.note)];
   late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? <PurchaseLine>[]) _Line(l)];
+  late bool _toReserve = widget.existing?.toReserve ?? widget.toReserve;
 
   Future<void> _addItem() async {
-    final id = await pickItem(context, store, already: {for (final l in _lines) l.itemId});
+    final id = await pickItem(context, store, already: {for (final l in _lines) l.itemId}, all: _toReserve);
     if (id != null) setState(() => _lines.add(_Line(PurchaseLine(itemId: id, qty: 0))));
   }
 
@@ -198,7 +200,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
     if (lines.isEmpty) return toast(context, tx('Add at least one item.', 'أضف مادة واحدة على الأقل.'));
     String? t(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
     store.savePurchase(
-      Purchase(no: no, date: _date, supplier: t(_supplier), note: t(_note), ref: t(_ref), lines: lines, paidLog: _paidLog),
+      Purchase(no: no, date: _date, supplier: t(_supplier), note: t(_note), ref: t(_ref), lines: lines, paidLog: _paidLog, toReserve: _toReserve),
       replacingNo: widget.existing?.no,
     );
     Navigator.pop(context);
@@ -288,6 +290,20 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
             ),
           ),
         ]),
+        const SizedBox(height: 16),
+        Text(tx('Goes into', 'تدخل إلى'), style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: SegmentedButton<bool>(
+            segments: [
+              ButtonSegment(value: false, icon: const Icon(Icons.inventory_2_outlined), label: Text(tx('Main store', 'المخزن الأساسي'))),
+              ButtonSegment(value: true, icon: const Icon(Icons.emergency_outlined), label: Text(tx('Reserve store', 'مخزن الاحتياط'))),
+            ],
+            selected: {_toReserve},
+            onSelectionChanged: (v) => setState(() => _toReserve = v.first),
+          ),
+        ),
         const SizedBox(height: 24),
         Wrap(
           spacing: 16,

@@ -40,3 +40,25 @@ Future<bool> requestPersistentStorage() async {
     return false;
   }
 }
+
+/// How a [shareFile] call ended.
+enum ShareResult { shared, cancelled, needsTap, unsupported }
+
+/// Opens the device's share sheet (WhatsApp, Mail, Telegram, AirDrop, Files ...) with the file.
+/// Safari only allows this straight after a tap: when the file took too long to make, the result
+/// is [ShareResult.needsTap] and the caller should offer a button that calls this again.
+Future<ShareResult> shareFile(String name, Uint8List bytes, String mime) async {
+  try {
+    final nav = web.window.navigator;
+    final file = web.File([bytes.toJS].toJS, name, web.FilePropertyBag(type: mime));
+    final data = web.ShareData(files: [file].toJS, title: name);
+    if (!nav.canShare(data)) return ShareResult.unsupported;
+    await nav.share(data).toDart;
+    return ShareResult.shared;
+  } catch (e) {
+    final s = e.toString();
+    if (s.contains('AbortError')) return ShareResult.cancelled;
+    if (s.contains('NotAllowedError')) return ShareResult.needsTap;
+    return ShareResult.unsupported;
+  }
+}
