@@ -426,7 +426,7 @@ class DatePickField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: label,
             suffixIcon: clearable && value != null
-                ? IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(null))
+                ? IconButton(tooltip: tx('Clear date', 'مسح التاريخ'), icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(null))
                 : const Icon(Icons.calendar_today_outlined, size: 18),
           ),
           child: Text(value == null ? tx('None', 'لا يوجد') : fmtDate(value)),

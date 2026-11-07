@@ -77,7 +77,7 @@ class _Grid extends StatelessWidget {
                       DataCell(Text(v == 0 ? '·' : fmtQty(v),
                           style: TextStyle(
                               fontWeight: i == values.length - 1 ? FontWeight.w700 : null,
-                              color: v == 0 ? Colors.grey : null))),
+                              color: v == 0 ? Theme.of(context).colorScheme.onSurfaceVariant : null))),
                   ]),
               ],
             ),
@@ -115,7 +115,7 @@ class _MonthlyUseState extends State<_MonthlyUse> {
               child: Text(
                   tx('Quantity issued per month. Months before the app use the Excel Year sheet.',
                       'الكمية المصروفة في كل شهر. الأشهر قبل التطبيق مأخوذة من ورقة السنة في إكسل.'),
-                  style: const TextStyle(color: Colors.grey))),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
         ]),
       ),
       Expanded(child: _Grid(columns: [...months.map(monthLabel), tx('Total', 'المجموع')], rows: rows)),
@@ -177,7 +177,7 @@ class _ByDepartmentState extends State<_ByDepartment> {
             },
           ),
           Text(tx('${rows.length} items issued to ${depts.length} departments', '${rows.length} مادة صُرفت إلى ${depts.length} قسم'),
-              style: const TextStyle(color: Colors.grey)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       ),
       Expanded(

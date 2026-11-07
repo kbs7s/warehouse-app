@@ -4,6 +4,7 @@ import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'item_picker.dart';
 
@@ -43,8 +44,8 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 12, runSpacing: 12, children: [
             _Total(tx('Total', 'المجموع'), sum((p) => p.amount)),
-            _Total(tx('Paid', 'المدفوع'), sum((p) => p.paid), color: Colors.green),
-            _Total(tx('Still owed', 'المتبقي'), sum((p) => p.remaining), color: Colors.red),
+            _Total(tx('Paid', 'المدفوع'), sum((p) => p.paid), color: Theme.of(context).colorScheme.good),
+            _Total(tx('Still owed', 'المتبقي'), sum((p) => p.remaining), color: Theme.of(context).colorScheme.bad),
           ]),
           const SizedBox(height: 12),
           Row(children: [
@@ -80,7 +81,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       children: [
                         Text(fmtQty(p.amount), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                         Text(p.settled ? tx('Paid', 'مسددة') : tx('Owed ${fmtQty(p.remaining)}', 'متبقي ${fmtQty(p.remaining)}'),
-                            style: TextStyle(color: p.settled ? Colors.green : Colors.red)),
+                            style: TextStyle(color: p.settled ? Theme.of(context).colorScheme.good : Theme.of(context).colorScheme.bad)),
                       ]),
                 );
               },
@@ -106,7 +107,7 @@ class _Total extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: TextStyle(color: Colors.grey.shade700)),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             Text(fmtQty(value),
                 style: Theme.of(context).textTheme.headlineSmall!.copyWith(color: color, fontWeight: FontWeight.w600)),
           ]),

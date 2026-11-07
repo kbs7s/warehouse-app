@@ -166,6 +166,7 @@ class _CloudSignInScreenState extends State<CloudSignInScreen> {
                   decoration: InputDecoration(
                     labelText: tx('Password', 'كلمة المرور'),
                     suffixIcon: IconButton(
+                        tooltip: _hide ? tx('Show password', 'إظهار كلمة المرور') : tx('Hide password', 'إخفاء كلمة المرور'),
                         onPressed: () => setState(() => _hide = !_hide), icon: Icon(_hide ? Icons.visibility : Icons.visibility_off)),
                   ),
                 ),
@@ -435,7 +436,19 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
         try {
           await widget.client.signUp(email, _password.text, keepCurrent: true);
         } on CloudError catch (e) {
-          if (e.code != 'EMAIL_EXISTS') rethrow; // they already have an account: just add them
+          if (e.code != 'EMAIL_EXISTS') rethrow;
+          // Anyone can create an account with any email, so an existing account may not be theirs,
+          // and the password typed here was not set on it.
+          if (!mounted) return;
+          final ok = await confirm(
+              context,
+              tx('This email already has an account', 'هذا البريد لديه حساب مسبقاً'),
+              tx('The password you typed was not saved: they sign in with the password they chose. '
+                      'Only add them if you know this person made the account.',
+                  'كلمة المرور التي كتبتها لم تُحفظ: سيدخل بكلمة المرور التي اختارها. '
+                      'أضِفه فقط إذا كنت متأكداً أن هذا الشخص هو من أنشأ الحساب.'),
+              action: tx('Add anyway', 'إضافة على أي حال'));
+          if (!ok) return;
         }
       }
       await widget.client.setMember(Member(email: email, name: _name.text.trim(), role: _owner ? 'owner' : 'staff'));

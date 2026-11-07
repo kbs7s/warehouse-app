@@ -5,6 +5,7 @@ import '../models.dart';
 import '../month.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'item_screens.dart';
 
@@ -53,7 +54,7 @@ class _StockScreenState extends State<StockScreen> {
                 count(StockStatus.out),
                 _filter == StockStatus.out,
                 () => setState(() => _filter = StockStatus.out),
-                color: Colors.red,
+                color: Theme.of(context).colorScheme.bad,
               ),
             ],
           ),
@@ -108,7 +109,7 @@ class _HeaderRow extends StatelessWidget {
   final bool phone, spend;
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).textTheme.labelLarge!.copyWith(color: Colors.grey.shade700);
+    final s = Theme.of(context).textTheme.labelLarge!.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
@@ -131,12 +132,12 @@ class _HeaderRow extends StatelessWidget {
           if (spend)
             SizedBox(
               width: _cols[6],
-              child: Text(tx('Spent', 'صرف الشهر'), style: s, textAlign: TextAlign.end),
+              child: Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: Text(tx('Spent', 'صرف الشهر'), style: s, textAlign: TextAlign.end)),
             ),
           if (spend)
             SizedBox(
               width: _cols[7],
-              child: Text(tx('Bought', 'مشتريات الشهر'), style: s, textAlign: TextAlign.end),
+              child: Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: Text(tx('Bought', 'مشتريات الشهر'), style: s, textAlign: TextAlign.end)),
             ),
           SizedBox(
             width: _cols[5],
@@ -166,7 +167,7 @@ class _StockRow extends StatelessWidget {
           if (!phone)
             SizedBox(
               width: _cols[0],
-              child: Text(s.item.id, style: const TextStyle(color: Colors.grey)),
+              child: Text(s.item.id, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ),
           Expanded(
             child: Column(
@@ -183,7 +184,7 @@ class _StockRow extends StatelessWidget {
                         if (month != 0) tx('spent ${fmtQty(month)} this month', 'صُرف ${fmtQty(month)} هذا الشهر'),
                         if (bought != 0) tx('bought ${fmtQty(bought)}', 'اشتُري ${fmtQty(bought)}'),
                       ].join(' · '),
-                      style: const TextStyle(color: Colors.grey, fontSize: 12.5)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12.5)),
               ],
             ),
           ),
@@ -204,7 +205,7 @@ class _StockRow extends StatelessWidget {
           if (spend)
             SizedBox(
               width: _cols[7],
-              child: Text(bought == 0 ? '·' : fmtQty(bought), textAlign: TextAlign.end, style: const TextStyle(color: Colors.grey)),
+              child: Text(bought == 0 ? '·' : fmtQty(bought), textAlign: TextAlign.end, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ),
           SizedBox(
             width: _cols[5],

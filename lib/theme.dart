@@ -9,6 +9,15 @@ class AppColors {
   static const info = Color(0xFF2563EB);
 }
 
+/// Status colours that stay readable as text in both light and dark mode
+/// (the fixed [AppColors] are too pale on white for small text, and too dark on the night theme).
+extension StatusColors on ColorScheme {
+  bool get _dark => brightness == Brightness.dark;
+  Color get good => _dark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
+  Color get warning => _dark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+  Color get bad => _dark ? const Color(0xFFF87171) : const Color(0xFFB91C1C);
+}
+
 /// Colours the user can pick in Settings (English name, Arabic name, colour).
 const accentChoices = <(String, String, Color)>[
   ('Teal', 'فيروزي', Color(0xFF0F766E)),
@@ -38,13 +47,35 @@ ThemeData buildTheme([Brightness brightness = Brightness.light, Color? seed]) {
     brightness: brightness,
     surface: dark ? const Color(0xFF0E1416) : const Color(0xFFF3F6F6),
   );
-  final base = ThemeData(
+  final themed = ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     fontFamily: 'NotoSans',
     fontFamilyFallback: const ['NotoSansArabic'],
     scaffoldBackgroundColor: scheme.surface,
     visualDensity: VisualDensity.standard,
+  );
+  // Same-width digits everywhere, so quantities and money line up in tables and tiles.
+  const digits = TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
+  final t = themed.textTheme;
+  final base = themed.copyWith(
+    textTheme: TextTheme(
+      displayLarge: t.displayLarge?.merge(digits),
+      displayMedium: t.displayMedium?.merge(digits),
+      displaySmall: t.displaySmall?.merge(digits),
+      headlineLarge: t.headlineLarge?.merge(digits),
+      headlineMedium: t.headlineMedium?.merge(digits),
+      headlineSmall: t.headlineSmall?.merge(digits),
+      titleLarge: t.titleLarge?.merge(digits),
+      titleMedium: t.titleMedium?.merge(digits),
+      titleSmall: t.titleSmall?.merge(digits),
+      bodyLarge: t.bodyLarge?.merge(digits),
+      bodyMedium: t.bodyMedium?.merge(digits),
+      bodySmall: t.bodySmall?.merge(digits),
+      labelLarge: t.labelLarge?.merge(digits),
+      labelMedium: t.labelMedium?.merge(digits),
+      labelSmall: t.labelSmall?.merge(digits),
+    ),
   );
   final radius = BorderRadius.circular(18);
   return base.copyWith(
