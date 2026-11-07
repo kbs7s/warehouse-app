@@ -146,9 +146,10 @@ String _source(String s) {
 
 /// Opens the add/edit item form. [item] null means a new item.
 /// New or edit item form: full screen on phones, a dialog on wider screens.
-Future<void> editItem(BuildContext context, WarehouseStore store, Item? item) {
+/// With [reserveOnly] a new item is kept only in the reserve (emergency) store.
+Future<void> editItem(BuildContext context, WarehouseStore store, Item? item, {bool reserveOnly = false}) {
   final size = MediaQuery.sizeOf(context);
-  final form = _ItemForm(store: store, item: item);
+  final form = _ItemForm(store: store, item: item, reserveOnly: reserveOnly);
   return showDialog(
     context: context,
     builder: (_) => size.width < 700
@@ -161,9 +162,10 @@ Future<void> editItem(BuildContext context, WarehouseStore store, Item? item) {
 }
 
 class _ItemForm extends StatefulWidget {
-  const _ItemForm({required this.store, this.item});
+  const _ItemForm({required this.store, this.item, this.reserveOnly = false});
   final WarehouseStore store;
   final Item? item;
+  final bool reserveOnly;
 
   @override
   State<_ItemForm> createState() => _ItemFormState();
@@ -180,6 +182,7 @@ class _ItemFormState extends State<_ItemForm> {
   late final _sale = TextEditingController(text: widget.item?.salePrice?.round().toString());
   late final _openCost = TextEditingController(text: widget.item?.openingUnitCost?.toString());
   late bool _active = widget.item?.active ?? true;
+  late bool _reserveOnly = widget.item?.reserveOnly ?? widget.reserveOnly;
 
   /// The units used most, for one-tap picking.
   late final List<String> _units = () {
@@ -195,11 +198,17 @@ class _ItemFormState extends State<_ItemForm> {
   void _save() {
     if (!_form.currentState!.validate()) return;
     final note = _note.text.trim();
+    final opening = parseNum(_opening.text)!;
+    final old = widget.item;
     widget.store.saveItem(Item(
       id: _id.text.trim(),
       name: _name.text.trim(),
       unit: _unit.text.trim(),
-      openingQty: parseNum(_opening.text)!,
+      openingQty: opening,
+      // A reserve-only item starts with all of it in the reserve. A main-store item keeps the part of
+      // its start that was in the reserve, unless it was a reserve-only item until now.
+      openingReserve: _reserveOnly ? opening : (old == null || old.reserveOnly ? 0 : old.openingReserve),
+      reserveOnly: _reserveOnly,
       minLevel: parseNum(_min.text)!,
       category: widget.item?.category,
       active: _active,
@@ -310,11 +319,31 @@ class _ItemFormState extends State<_ItemForm> {
             ],
           ]),
           section(tx('Stock', 'المخزون'), Icons.warehouse_outlined, hint: tx('The app adds purchases and takes away issues by itself.', 'التطبيق يضيف المشتريات ويطرح الصرف تلقائياً.'), [
+            Text(tx('Kept in', 'مكان الخزن'), style: t.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(value: false, icon: const Icon(Icons.inventory_2_outlined), label: Text(tx('Main store', 'المخزن الأساسي'))),
+                ButtonSegment(value: true, icon: const Icon(Icons.emergency_outlined), label: Text(tx('Reserve store only', 'مخزن الاحتياط فقط'))),
+              ],
+              selected: {_reserveOnly},
+              onSelectionChanged: (v) => setState(() => _reserveOnly = v.first),
+            ),
+            if (_reserveOnly) ...[
+              const SizedBox(height: 6),
+              Text(
+                  tx('Shows only in the reserve store and its count, not in the main store lists.',
+                      'تظهر في مخزن الاحتياط وجرده فقط، ولا تظهر في قوائم المخزن الأساسي.'),
+                  style: TextStyle(color: t.colorScheme.onSurfaceVariant, fontSize: 13)),
+            ],
+            const SizedBox(height: 14),
             pair(
               TextFormField(
                 controller: _opening,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: tx('Starting quantity', 'الكمية الأولى'), suffixText: _unit.text.trim()),
+                decoration: InputDecoration(
+                    labelText: _reserveOnly ? tx('Starting quantity in reserve', 'الكمية الأولى في الاحتياط') : tx('Starting quantity', 'الكمية الأولى'),
+                    suffixText: _unit.text.trim()),
                 validator: numCheck,
               ),
               TextFormField(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../expiry.dart';
 import '../insights.dart';
+import '../export.dart';
 import '../l10n.dart';
 import '../models.dart';
 import '../month.dart';
@@ -130,6 +131,8 @@ class HomeScreen extends StatelessWidget {
             onIssue: () => openReceipt(context, s, null),
             onPurchase: () => openPurchase(context, s, null),
             trailing: [
+              if (!(s.cloud?.isStaff ?? false))
+                _HeroIcon(Icons.table_view_outlined, tx('Export everything to Excel', 'تصدير كل البيانات إلى إكسل'), () => exportExcel(s)),
               ChangesBell(store: s, color: Colors.white),
               SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
               if (w < 700) ...[

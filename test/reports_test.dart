@@ -49,7 +49,10 @@ void main() {
     final s = seeded();
     final bytes = buildXlsx(workbookSheets(s, DateTime(2026, 10, 1)));
     final zip = ZipDecoder().decodeBytes(bytes);
-    expect(zip.files.where((f) => f.name.startsWith('xl/worksheets/')).length, 8);
+    final sheets = workbookSheets(s, DateTime(2026, 10, 1));
+    expect(zip.files.where((f) => f.name.startsWith('xl/worksheets/')).length, sheets.length);
+    expect(sheets.map((x) => x.name).toSet().length, sheets.length, reason: 'sheet names must be unique');
+    expect(sheets.map((x) => x.name), containsAll(['Stock', 'Reserve store', 'Issue receipts', 'Purchases', 'Moves', 'Departments', 'Months']));
     File('build/export-test.xlsx')
       ..createSync(recursive: true)
       ..writeAsBytesSync(bytes);

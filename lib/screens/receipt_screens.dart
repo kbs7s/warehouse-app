@@ -8,6 +8,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
 import 'item_picker.dart';
+import 'send_file.dart';
 
 /// List of issue receipts (items given to departments), newest first.
 class ReceiptsScreen extends StatefulWidget {
@@ -59,7 +60,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
             trailing: IconButton(
               tooltip: 'PDF',
               icon: const Icon(Icons.picture_as_pdf_outlined),
-              onPressed: () => shareReceiptPdf(store, r),
+              onPressed: () => sendReceipt(context, store, r),
             ),
             onTap: () => openReceipt(context, store, r),
           );
@@ -68,6 +69,10 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     );
   }
 }
+
+/// The send / print / save sheet for an issue receipt's PDF.
+Future<void> sendReceipt(BuildContext context, WarehouseStore store, Receipt r) => showPdfSheet(context,
+    name: 'Receipt-${r.no}', make: () => buildReceiptPdf(store, r), print: () => shareReceiptPdf(store, r));
 
 void openReceipt(BuildContext context, WarehouseStore store, Receipt? r, {bool fromReserve = false}) => Navigator.of(context).push(
   MaterialPageRoute(
@@ -136,7 +141,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   }
 
   Future<void> _addItem() async {
-    final id = await pickItem(context, store, already: {for (final l in _lines) l.itemId});
+    final id = await pickItem(context, store, already: {for (final l in _lines) l.itemId}, reserve: _reserve);
     if (id != null) setState(() => _lines.add(_Line(id, null)));
   }
 
@@ -185,8 +190,9 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     }
     store.saveReceipt(r, replacingNo: widget.existing?.no);
     if (!mounted) return;
-    Navigator.pop(context);
-    if (pdf) await shareReceiptPdf(store, r);
+    final nav = Navigator.of(context);
+    nav.pop();
+    if (pdf && nav.mounted) await sendReceipt(nav.context, store, r);
   }
 
   @override

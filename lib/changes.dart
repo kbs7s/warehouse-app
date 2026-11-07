@@ -39,39 +39,46 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
     names.putIfAbsent('${i['id']}', () => '${i['name']}');
   }
   String item(Object? id) => names['$id'] ?? '$id';
+
+  // Closing a month moves its issues, purchases and moves into the closed month and resets the
+  // items' opening stock; reopening puts them back. Those are one "Month closed" line, not many.
+  Set<String> fresh(Object? v) => {for (final m in _list(v)) if (m['fresh'] == true) '${m['from']}'};
+  final closing = fresh(after['monthCloses']).difference(fresh(before['monthCloses'])).isNotEmpty;
+  final reopening = fresh(before['monthCloses']).difference(fresh(after['monthCloses'])).isNotEmpty;
+  void Function(Map<String, dynamic>) unless(bool skip, void Function(Map<String, dynamic>) f) => skip ? (_) {} : f;
   String n(int count, String one, String many) => count == 1 ? one : many;
 
   // Issues to departments.
   _diff(before['receipts'], after['receipts'], (r) => '${r['no']}',
-      added: (r) {
+      added: unless(reopening, (r) {
         final lines = (r['lines'] as List? ?? const []).length;
         final dept = (r['department'] as String?) ?? '';
         add(ChangeKind.issue, 'Issue #${r['no']}${dept.isEmpty ? '' : ' to $dept'} · $lines ${n(lines, 'item', 'items')}',
             'وصل صرف رقم ${r['no']}${dept.isEmpty ? '' : ' إلى $dept'} · $lines ${n(lines, 'مادة', 'مواد')}', r);
-      },
+      }),
       edited: (r) => add(ChangeKind.issue, 'Issue #${r['no']} edited', 'تعديل وصل الصرف رقم ${r['no']}', r),
-      removed: (r) => add(ChangeKind.issue, 'Issue #${r['no']} deleted', 'حذف وصل الصرف رقم ${r['no']}'));
+      removed: unless(closing, (r) => add(ChangeKind.issue, 'Issue #${r['no']} deleted', 'حذف وصل الصرف رقم ${r['no']}')));
 
   // Purchases.
   _diff(before['purchases'], after['purchases'], (p) => '${p['no']}',
-      added: (p) {
+      added: unless(reopening, (p) {
         final lines = (p['lines'] as List? ?? const []).length;
         final sup = (p['supplier'] as String?) ?? '';
         add(ChangeKind.purchase, 'Purchase #${p['no']}${sup.isEmpty ? '' : ' from $sup'} · $lines ${n(lines, 'item', 'items')}',
             'شراء رقم ${p['no']}${sup.isEmpty ? '' : ' من $sup'} · $lines ${n(lines, 'مادة', 'مواد')}', p);
-      },
+      }),
       edited: (p) => add(ChangeKind.purchase, 'Purchase #${p['no']} edited', 'تعديل الشراء رقم ${p['no']}', p),
-      removed: (p) => add(ChangeKind.purchase, 'Purchase #${p['no']} deleted', 'حذف الشراء رقم ${p['no']}'));
+      removed: unless(closing, (p) => add(ChangeKind.purchase, 'Purchase #${p['no']} deleted', 'حذف الشراء رقم ${p['no']}')));
 
   // Moves between the main store and the reserve store.
   _diff(before['transfers'], after['transfers'], (t) => '${t['no']}',
-      added: (t) => t['toReserve'] == true
+      added: unless(reopening, (t) => t['toReserve'] == true
           ? add(ChangeKind.move, 'Moved ${t['qty']} ${item(t['itemId'])} to the reserve store',
               'نقل ${t['qty']} ${item(t['itemId'])} إلى مخزن الاحتياط')
           : add(ChangeKind.move, 'Moved ${t['qty']} ${item(t['itemId'])} back to the main store',
-              'إرجاع ${t['qty']} ${item(t['itemId'])} إلى المخزن الأساسي'),
+              'إرجاع ${t['qty']} ${item(t['itemId'])} إلى المخزن الأساسي')),
       edited: (t) => add(ChangeKind.move, 'Move of ${item(t['itemId'])} edited', 'تعديل نقل ${item(t['itemId'])}'),
-      removed: (t) => add(ChangeKind.move, 'Move of ${item(t['itemId'])} deleted', 'حذف نقل ${item(t['itemId'])}'));
+      removed: unless(closing, (t) => add(ChangeKind.move, 'Move of ${item(t['itemId'])} deleted', 'حذف نقل ${item(t['itemId'])}')));
 
   // Items. A purchase with expiry dates also updates its items' dates: that is part of the
   // purchase line above, so only expiry dates changed by hand are listed.
@@ -81,6 +88,9 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
       added: (i) => add(ChangeKind.item, 'New item: ${i['name']}', 'مادة جديدة: ${i['name']}'),
       edited: (i) {
         Map<String, dynamic> rest(Map<String, dynamic> m) => {...m}..remove('expiries');
+        Map<String, dynamic> own(Map<String, dynamic> m) =>
+            closing || reopening ? (rest(m)..remove('openingQty')..remove('openingReserve')..remove('openingUnitCost')) : rest(m);
+        if (_same(own(oldItems['${i['id']}']!), own(i)) && !_same(rest(oldItems['${i['id']}']!), rest(i))) return;
         if (!_same(rest(oldItems['${i['id']}']!), rest(i))) {
           add(ChangeKind.item, 'Item edited: ${i['name']}', 'تعديل مادة: ${i['name']}');
         } else if (!purchased) {
@@ -120,6 +130,7 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
   var settings = false;
   for (final k in {...before.keys, ...after.keys}) {
     if (handled.contains(k) || _same(before[k], after[k])) continue;
+    if ((k == 'payments' || k == 'monthStart') && (closing || reopening)) continue; // carried bills, new month start
     final s = sections[k];
     if (s != null) {
       add(ChangeKind.other, s.$1, s.$2);

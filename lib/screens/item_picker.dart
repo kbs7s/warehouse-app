@@ -5,14 +5,17 @@ import '../models.dart';
 import '../store.dart';
 import '../ui.dart';
 
-/// Searchable list of items; returns the chosen item id, or null.
-Future<String?> pickItem(BuildContext context, WarehouseStore store, {Set<String> already = const {}}) =>
-    showDialog<String>(context: context, builder: (_) => _ItemPicker(store: store, already: already));
+/// Searchable list of items; returns the chosen item id, or null. With [reserve] it lists the
+/// reserve store's items (including those kept only there) and their reserve quantity; with [all]
+/// every item of either store.
+Future<String?> pickItem(BuildContext context, WarehouseStore store, {Set<String> already = const {}, bool reserve = false, bool all = false}) =>
+    showDialog<String>(context: context, builder: (_) => _ItemPicker(store: store, already: already, reserve: reserve, all: all));
 
 class _ItemPicker extends StatefulWidget {
-  const _ItemPicker({required this.store, required this.already});
+  const _ItemPicker({required this.store, required this.already, this.reserve = false, this.all = false});
   final WarehouseStore store;
   final Set<String> already;
+  final bool reserve, all;
 
   @override
   State<_ItemPicker> createState() => _ItemPickerState();
@@ -24,7 +27,7 @@ class _ItemPickerState extends State<_ItemPicker> {
   @override
   Widget build(BuildContext context) {
     final q = _q.trim().toLowerCase();
-    final list = widget.store.stockList
+    final list = (widget.reserve ? widget.store.reserveStockList : widget.all ? widget.store.allStockList : widget.store.stockList)
         .where((s) => q.isEmpty || s.item.name.toLowerCase().contains(q) || s.item.id.toLowerCase().contains(q))
         .toList();
     return Dialog(
@@ -54,10 +57,10 @@ class _ItemPickerState extends State<_ItemPicker> {
                   title: Align(alignment: AlignmentDirectional.centerStart, child: NameText(s.item.name, style: const TextStyle(fontSize: 17))),
                   subtitle: Text(added ? tx('${s.item.id} · already on this list', '${s.item.id} · موجودة في القائمة') : s.item.id),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('${fmtQty(s.qty)} ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text('${fmtQty(widget.reserve || s.item.reserveOnly ? s.reserve : s.qty)} ', style: const TextStyle(fontWeight: FontWeight.w600)),
                     NameText(s.item.unit),
                     const SizedBox(width: 8),
-                    if (s.status != StockStatus.inStock) StatusChip(s.status),
+                    if (!widget.reserve && !s.item.reserveOnly && s.status != StockStatus.inStock) StatusChip(s.status),
                   ]),
                   onTap: () => Navigator.pop(context, s.item.id),
                 );

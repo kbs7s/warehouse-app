@@ -6,9 +6,10 @@ import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
 import 'item_picker.dart';
+import 'item_screens.dart';
 import 'receipt_screens.dart';
 
-/// The reserve store: the same items as the main store, kept apart for emergencies.
+/// The reserve store: items moved from the main store, and items kept only here, for emergencies.
 class ReserveScreen extends StatefulWidget {
   const ReserveScreen({super.key, required this.store});
   final WarehouseStore store;
@@ -24,11 +25,12 @@ class _ReserveScreenState extends State<ReserveScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.store;
-    final all = s.stockList;
-    final held = all.where((x) => x.reserve != 0).length;
+    final all = s.allStockList;
+    bool inReserve(x) => x.reserve != 0 || x.item.reserveOnly;
+    final held = all.where(inReserve).length;
     final q = _q.trim().toLowerCase();
     final rows = all
-        .where((x) => !_inReserveOnly || x.reserve != 0)
+        .where((x) => !_inReserveOnly || inReserve(x))
         .where((x) => q.isEmpty || x.item.name.toLowerCase().contains(q) || x.item.id.toLowerCase().contains(q))
         .toList();
 
@@ -43,7 +45,8 @@ class _ReserveScreenState extends State<ReserveScreen> {
       ),
       body: CardList(
         empty: _inReserveOnly
-            ? tx('Nothing in the reserve store yet. Use "Move to reserve" to fill it.', 'لا توجد مواد في الاحتياط بعد. استخدم "نقل إلى الاحتياط" لملئه.')
+            ? tx('Nothing in the reserve store yet. Use "Move to reserve" or "Add item" to fill it.',
+                'لا توجد مواد في الاحتياط بعد. استخدم "نقل إلى الاحتياط" أو "إضافة مادة" لملئه.')
             : tx('No items match.', 'لا توجد مواد مطابقة.'),
         header: [
           Wrap(spacing: 12, runSpacing: 8, children: [
@@ -56,6 +59,11 @@ class _ReserveScreenState extends State<ReserveScreen> {
               onPressed: () => moveStock(context, s, toReserve: false),
               icon: const Icon(Icons.move_up),
               label: Text(tx('Back to main store', 'إرجاع إلى المخزن الأساسي')),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => editItem(context, s, null, reserveOnly: true),
+              icon: const Icon(Icons.add),
+              label: Text(tx('Add item to reserve', 'إضافة مادة للاحتياط')),
             ),
           ]),
           const SizedBox(height: 12),
@@ -74,10 +82,14 @@ class _ReserveScreenState extends State<ReserveScreen> {
           final x = rows[i];
           return ListTile(
             title: NameText(x.item.name, style: const TextStyle(fontSize: 16.5)),
-            subtitle: Text('${x.item.id} · ${x.item.unit} · ${tx('main store', 'الأساسي')} ${fmtQty(x.qty)}'),
+            subtitle: Text(x.item.reserveOnly
+                ? '${x.item.id} · ${x.item.unit} · ${tx('reserve only', 'احتياط فقط')}'
+                : '${x.item.id} · ${x.item.unit} · ${tx('main store', 'الأساسي')} ${fmtQty(x.qty)}'),
             trailing: Text(fmtQty(x.reserve),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: x.reserve < 0 ? AppColors.bad : null)),
-            onTap: () => moveStock(context, s, itemId: x.item.id, toReserve: true),
+            onTap: () => x.item.reserveOnly
+                ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => ItemDetailScreen(store: s, itemId: x.item.id)))
+                : moveStock(context, s, itemId: x.item.id, toReserve: true),
           );
         },
       ),

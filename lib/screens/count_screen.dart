@@ -27,8 +27,8 @@ class _StockCountScreenState extends State<StockCountScreen> {
   /// The reserve count covers the items held in the reserve when it starts.
   List<Item> get _items {
     final s = widget.store;
-    if (!widget.reserve) return [...s.activeItems]..sort((a, b) => a.id.compareTo(b.id));
-    final ids = _count?.items ?? [for (final x in s.stockList) if (x.reserve != 0) x.item.id];
+    if (!widget.reserve) return [for (final i in s.activeItems) if (!i.reserveOnly) i]..sort((a, b) => a.id.compareTo(b.id));
+    final ids = _count?.items ?? [for (final x in s.reserveStockList) x.item.id];
     return [for (final id in ids) ?s.item(id)]..sort((a, b) => a.id.compareTo(b.id));
   }
 

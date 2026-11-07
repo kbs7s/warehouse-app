@@ -225,6 +225,7 @@ class WarehouseStore extends ChangeNotifier {
   void _changed({bool save = true}) {
     final bought = <String, num>{};
     final issued = <String, num>{};
+    final live = liveInvoices;
     for (final p in purchases) {
       for (final l in p.lines) {
         bought[l.itemId] = (bought[l.itemId] ?? 0) + l.qty;
@@ -236,12 +237,18 @@ class WarehouseStore extends ChangeNotifier {
       }
     }
     final sold = <String, num>{};
-    for (final inv in invoices) {
+    for (final inv in live) {
       for (final l in inv.lines) {
         if (l.itemId != null) sold[l.itemId!] = (sold[l.itemId!] ?? 0) + l.qty;
       }
     }
-    final reserve = <String, num>{};
+    final reserve = <String, num>{for (final i in items) if (i.openingReserve != 0) i.id: i.openingReserve};
+    for (final p in purchases) {
+      if (!p.toReserve) continue;
+      for (final l in p.lines) {
+        reserve[l.itemId] = (reserve[l.itemId] ?? 0) + l.qty;
+      }
+    }
     for (final t in transfers) {
       reserve[t.itemId] = (reserve[t.itemId] ?? 0) + (t.toReserve ? t.qty : -t.qty);
     }
@@ -254,7 +261,7 @@ class WarehouseStore extends ChangeNotifier {
     _stock = {
       for (final i in items) i.id: StockInfo(i, bought[i.id] ?? 0, issued[i.id] ?? 0, sold[i.id] ?? 0, reserve[i.id] ?? 0)
     };
-    ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: invoices);
+    ledger = Ledger.build(items: items, purchases: purchases, receipts: receipts, invoices: live);
     if (save && _db != null) _record.put(_db, jsonEncode(toJson()));
     notifyListeners();
     if (save) onLocalSave?.call();
@@ -281,20 +288,99 @@ class WarehouseStore extends ChangeNotifier {
     _changed();
   }
 
+  /// Last day of the latest month closed with a fresh start: records up to it are counted in the
+  /// items' opening stock. Null when no month was closed that way.
+  String? get stockCutoff {
+    for (final m in monthCloses.reversed) {
+      if (m.fresh) return m.to;
+    }
+    return null;
+  }
+
+  /// Client invoices that still change stock: those after the last fresh-start close.
+  List<Invoice> get liveInvoices {
+    final cut = stockCutoff;
+    if (cut == null) return invoices;
+    return [for (final i in invoices) if (i.date.compareTo(cut) > 0) i];
+  }
+
+  /// Issues of the open month plus those kept with closed months, oldest month first.
+  List<Receipt> get allReceipts => [for (final m in monthCloses) ...m.issueList, ...receipts];
+  List<Purchase> get allPurchases => [for (final m in monthCloses) ...m.purchaseList, ...purchases];
+  List<Transfer> get allTransfers => [for (final m in monthCloses) ...m.transferList, ...transfers];
+
+  /// Saves [c] as closed and starts the new month from the stock it ended with (see closeMonth).
+  void startFreshMonth(MonthClose c, {required Map<String, num> closing, required Map<String, num> reserve}) {
+    for (final i in items) {
+      final q = closing[i.id];
+      if (q == null) continue;
+      final value = ledger.itemValue(i.id);
+      if (q > 0 && value > 0) i.openingUnitCost = value / q;
+      i.openingQty = q;
+      i.openingReserve = reserve[i.id] ?? 0;
+    }
+    for (final p in c.purchaseList) {
+      if (p.owed <= 0) continue;
+      payments.add(Payment(
+        no: nextPaymentNo,
+        supplier: p.supplier,
+        date: p.date,
+        amount: p.total,
+        paid: p.paid,
+        details: 'Purchase #${p.no}${p.ref == null || p.ref!.isEmpty ? '' : ' (${p.ref})'} · ${c.from.substring(0, 7)}',
+        carriedFrom: c.from,
+      ));
+    }
+    final r = c.issueList.toSet(), p = c.purchaseList.toSet(), t = c.transferList.toSet();
+    receipts.removeWhere(r.contains);
+    purchases.removeWhere(p.contains);
+    transfers.removeWhere(t.contains);
+    monthCloses = [...monthCloses, c];
+    monthStart = null;
+    _changed();
+  }
+
+  /// Puts a fresh-start month back: its records return to the open lists and the items get back
+  /// the opening stock they had before it was closed.
+  void undoFreshMonth(MonthClose c) {
+    receipts = [...c.issueList, ...receipts]..sort((a, b) => a.no.compareTo(b.no));
+    purchases = [...c.purchaseList, ...purchases]..sort((a, b) => a.no.compareTo(b.no));
+    transfers = [...c.transferList, ...transfers]..sort((a, b) => a.no.compareTo(b.no));
+    payments.removeWhere((b) => b.carriedFrom == c.from);
+    for (final i in items) {
+      final b = c.before[i.id];
+      if (b == null) continue;
+      i.openingQty = b[0] ?? 0;
+      i.openingReserve = b.length > 1 ? (b[1] ?? 0) : 0;
+      i.openingUnitCost = b.length > 2 ? b[2] : null;
+    }
+    monthCloses = monthCloses.where((m) => !identical(m, c)).toList();
+    monthStart = c.from;
+    _changed();
+  }
+
   // ---------- Queries ----------
 
   Item? item(String id) => items.where((i) => i.id == id).firstOrNull;
   StockInfo stock(String itemId) => _stock[itemId] ?? StockInfo(item(itemId) ?? Item(id: itemId, name: itemId, unit: ''), 0, 0);
-  List<StockInfo> get stockList => [for (final i in items) if (i.active) _stock[i.id]!];
+  /// Active items of the main store (items kept only in the reserve are left out).
+  List<StockInfo> get stockList => [for (final i in items) if (i.active && !i.reserveOnly) _stock[i.id]!];
+
+  /// Active items of the reserve store: those with stock in it and those kept only there.
+  List<StockInfo> get reserveStockList =>
+      [for (final i in items) if (i.active && (i.reserveOnly || _stock[i.id]!.reserve != 0)) _stock[i.id]!];
+
+  /// Every active item, in either store.
+  List<StockInfo> get allStockList => [for (final i in items) if (i.active) _stock[i.id]!];
   List<Item> get activeItems => [for (final i in items) if (i.active) i];
 
   /// Every purchase and issue of one item, newest first.
   List<({String? date, String kind, String party, int no, num qty})> movements(String itemId) {
     final out = <({String? date, String kind, String party, int no, num qty})>[
-      for (final p in purchases)
+      for (final p in allPurchases)
         for (final l in p.lines)
           if (l.itemId == itemId) (date: p.date, kind: 'Purchase', party: p.supplier ?? '', no: p.no, qty: l.qty),
-      for (final r in receipts)
+      for (final r in allReceipts)
         for (final l in r.lines)
           if (l.itemId == itemId)
             (date: r.date, kind: 'Issue', party: r.department ?? '', no: r.no, qty: -l.qty),
@@ -449,12 +535,26 @@ class WarehouseStore extends ChangeNotifier {
 
   /// Purchases and suppliers' payment state.
   List<Purchase> purchasesOf(String supplier) => [for (final p in purchases) if ((p.supplier ?? '') == supplier) p];
-  num owedTo(String supplier) => purchasesOf(supplier).fold<num>(0, (s, p) => s + p.owed);
+
+  /// Unpaid purchases carried over from closed months, as bills.
+  List<Payment> carriedBillsOf(String supplier) =>
+      [for (final b in payments) if (b.carriedFrom != null && (b.supplier ?? '') == supplier) b];
+  num owedTo(String supplier) =>
+      purchasesOf(supplier).fold<num>(0, (s, p) => s + p.owed) +
+      carriedBillsOf(supplier).fold<num>(0, (s, b) => s + (b.remaining > 0 ? b.remaining : 0));
 
   /// Records [amount] paid to [supplier], settling their oldest unpaid purchases first.
   /// Returns what was left over because nothing more was owed.
   num paySupplier(String supplier, num amount, {required String date, String? note}) {
     var left = amount;
+    final carried = carriedBillsOf(supplier).where((b) => b.remaining > 0).toList()
+      ..sort((a, b) => (a.date ?? '').compareTo(b.date ?? ''));
+    for (final b in carried) {
+      if (left <= 0) break;
+      final part = left < b.remaining ? left : b.remaining;
+      b.paid += part;
+      left -= part;
+    }
     final open = purchasesOf(supplier).where((p) => p.owed > 0).toList()
       ..sort((a, b) => (a.date ?? '').compareTo(b.date ?? '') != 0
           ? (a.date ?? '').compareTo(b.date ?? '')
@@ -502,7 +602,7 @@ class WarehouseStore extends ChangeNotifier {
   Map<String, Map<String, num>> monthlyIssued() {
     final out = <String, Map<String, num>>{};
     final appMonths = <String>{};
-    for (final r in receipts) {
+    for (final r in allReceipts) {
       if (r.date == null) continue;
       final m = r.date!.substring(0, 7);
       appMonths.add(m);
@@ -522,7 +622,7 @@ class WarehouseStore extends ChangeNotifier {
   /// Quantity issued per department per item between two dates (inclusive, yyyy-MM-dd).
   Map<String, Map<String, num>> issuedByDepartment(String from, String to) {
     final out = <String, Map<String, num>>{};
-    for (final r in receipts) {
+    for (final r in allReceipts) {
       final d = r.date;
       if (d == null || d.compareTo(from) < 0 || d.compareTo(to) > 0) continue;
       final dept = out.putIfAbsent(r.department ?? '—', () => {});
@@ -574,10 +674,12 @@ class WarehouseStore extends ChangeNotifier {
   num owedBy(String clientId) => invoicesOf(clientId).fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
   num get owedToUs => invoices.fold<num>(0, (s, i) => s + (i.balance > 0 ? i.balance : 0));
   /// Still owed on purchases whose payment is tracked.
-  num get weOwe => purchases.fold<num>(0, (s, p) => s + p.owed);
+  num get weOwe =>
+      purchases.fold<num>(0, (s, p) => s + p.owed) +
+      payments.fold<num>(0, (s, b) => s + (b.carriedFrom != null && b.remaining > 0 ? b.remaining : 0));
 
   /// Older supplier bills (the Excel تسديد sheet) not yet fully paid.
-  List<Payment> get openBills => [for (final p in payments) if (!p.settled) p];
+  List<Payment> get openBills => [for (final p in payments) if (!p.settled && p.carriedFrom == null) p];
   List<Invoice> overdue(String today) => [for (final i in invoices) if (i.status(today) == InvoiceStatus.overdue) i];
 
   void saveExpense(Expense e) {

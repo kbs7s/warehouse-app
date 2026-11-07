@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../export.dart';
 import '../l10n.dart';
 import '../month.dart';
-import '../platform/files.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
-import '../xlsx.dart';
+import 'archive_screens.dart';
 import 'item_screens.dart';
 
 String _monthName(String iso) {
@@ -15,6 +15,10 @@ String _monthName(String iso) {
   const en = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return '${isAr ? arMonths[d.month - 1] : en[d.month - 1]} ${d.year}';
 }
+
+/// "November 2026" when the dates fall in one calendar month, otherwise "3/10/2026 – 2/11/2026".
+String monthName(String from, String to) =>
+    from.substring(0, 7) == to.substring(0, 7) ? _monthName(from) : '${fmtDate(from)} – ${fmtDate(to)}';
 
 /// "October 2026" for a whole calendar month, otherwise "3 Oct 2026 – 28 Oct 2026".
 String monthTitle(String from, String to) {
@@ -24,23 +28,6 @@ String monthTitle(String from, String to) {
 }
 
 num _sum(Iterable<num> v) => v.fold<num>(0, (a, b) => a + b);
-
-Future<void> _exportMonth(String title, String file, List<MonthRow> rows, {Map<String, num>? year}) async {
-  final sheet = Sheet(
-    tx('Month', 'الشهر'),
-    [
-      tx('Code', 'الرمز'), tx('Item', 'المادة'), tx('Unit', 'الوحدة'), tx('Start of month', 'أول الشهر'), tx('Received', 'الوارد'),
-      tx('Issued (spend)', 'المصروف'), if (year != null) tx('Issued this year', 'مصروف السنة'), tx('End of month', 'آخر الشهر'),
-    ],
-    [
-      [title],
-      for (final r in rows)
-        [r.itemId, r.name, r.unit, r.opening, r.received, r.issued, if (year != null) year[r.itemId] ?? 0, r.closing],
-    ],
-    rightToLeft: isAr,
-  );
-  await downloadFile(file, buildXlsx([sheet]), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-}
 
 /// The open month: what each item started with, received and spent, its stock now, and the
 /// button that saves the month and starts a new one.
@@ -80,7 +67,21 @@ class _MonthScreenState extends State<MonthScreen> {
           IconButton(
             tooltip: tx('Export to Excel', 'تصدير إلى إكسل'),
             icon: const Icon(Icons.table_view_outlined),
-            onPressed: () => _exportMonth(monthTitle(from, to), 'month-$from.xlsx', rows, year: year),
+            onPressed: () => exportMonthExcel(
+              s,
+              'month-${from.substring(0, 7)}.xlsx',
+              monthSheets(s,
+                  title: monthName(from, to),
+                  from: from,
+                  to: to,
+                  rows: rows,
+                  stats: const {},
+                  issues: [for (final r in s.receipts) if ((r.date ?? '').compareTo(from) >= 0) r],
+                  purchases: [for (final p in s.purchases) if ((p.date ?? '').compareTo(from) >= 0) p],
+                  moves: [for (final t in s.transfers) if (t.date.compareTo(from) >= 0) t],
+                  reserveStart: s.reserveAt(beforeDay: from),
+                  reserveEnd: s.reserveAt()),
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -124,20 +125,22 @@ class _MonthScreenState extends State<MonthScreen> {
         const SizedBox(height: 12),
         MonthTable(store: s, rows: shown, year: year, emptyText: tx('Nothing issued or received yet this month.', 'لم يُصرف أو يرد شيء بعد هذا الشهر.')),
         if (s.monthCloses.isNotEmpty) ...[
-          SectionTitle(tx('Past months', 'الأشهر السابقة'), trailing: Text('${s.monthCloses.length}')),
+          SectionTitle(tx('Recent closed months', 'آخر الأشهر المغلقة'),
+              trailing: TextButton(
+                  onPressed: () => SubNav.select(context, 1), child: Text(tx('All in Archive', 'الكل في الأرشيف')))),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(children: [
-              for (final (i, m) in s.monthCloses.reversed.indexed) ...[
+              for (final (i, m) in s.monthCloses.reversed.take(3).indexed) ...[
                 if (i > 0) const Divider(height: 1),
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: t.colorScheme.secondaryContainer,
                       child: Icon(Icons.event_available, color: t.colorScheme.onSecondaryContainer, size: 20)),
-                  title: Text(monthTitle(m.from, m.to), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text(monthName(m.from, m.to), style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text(tx('Spent ${fmtQty(m.issued)} units · ${m.receipts} receipts', 'المصروف ${fmtQty(m.issued)} وحدة · ${m.receipts} وصل')),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ClosedMonthScreen(store: s, month: m))),
+                  onTap: () => openClosedMonth(context, s, m),
                 ),
               ],
             ]),
@@ -184,8 +187,8 @@ class _OpenMonthCard extends StatelessWidget {
             style: t.textTheme.headlineSmall!.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         Text(
-            tx('Spend counts from this date. At month end, close the month to save every item\'s spend and stock and start again from zero.',
-                'يُحسب الصرف من هذا التاريخ. في نهاية الشهر أغلق الشهر لحفظ صرف ورصيد كل مادة والبدء من الصفر.'),
+            tx('Spend counts from this date. At month end, close the month: it is kept in the Archive, numbering starts again from 1, and the stock left becomes the new month\'s start.',
+                'يُحسب الصرف من هذا التاريخ. في نهاية الشهر أغلق الشهر: يُحفظ في الأرشيف، ويبدأ الترقيم من 1، ويصبح الرصيد المتبقي رصيد أول الشهر الجديد.'),
             style: t.textTheme.bodyMedium!.copyWith(color: Colors.white70)),
         const SizedBox(height: 16),
         Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -211,19 +214,21 @@ class _OpenMonthCard extends StatelessWidget {
     final monthEnd = DateTime(start.year, start.month + 1, 0);
     final now = DateTime.now();
     var end = now.isAfter(monthEnd) ? monthEnd : DateTime(now.year, now.month, now.day);
+    final stats = {for (final k in monthStatKeys) k.$1: TextEditingController()};
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, setState) => AlertDialog(
           title: Text(tx('Close the month?', 'إغلاق الشهر؟')),
           content: SizedBox(
-            width: 440,
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            width: 480,
+            child: SingleChildScrollView(
+             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(tx(
-                  'This saves, for every item, the stock at the start, what was received, what was spent and the stock at the end. '
-                      'Then spend starts again from zero. Stock itself does not change.',
-                  'سيُحفظ لكل مادة رصيد أول الشهر والوارد والمصروف ورصيد آخر الشهر. '
-                      'بعدها يبدأ الصرف من الصفر. الرصيد نفسه لا يتغيّر.')),
+                  'The month is kept in the Archive with its issues, purchases and departments. '
+                      'Then issue and purchase numbers start again from 1, spend starts from zero, and the stock in both stores becomes the new month\'s start.',
+                  'يُحفظ الشهر في الأرشيف مع صرفياته ومشترياته وأقسامه. '
+                      'بعدها يبدأ ترقيم وصولات الصرف والمشتريات من 1، ويبدأ الصرف من الصفر، ويصبح رصيد المخزنين رصيد أول الشهر الجديد.')),
               const SizedBox(height: 16),
               InkWell(
                 onTap: () async {
@@ -246,7 +251,16 @@ class _OpenMonthCard extends StatelessWidget {
               Text(tx('The new month starts on ${fmtDate(isoDate(end.add(const Duration(days: 1))))}.',
                   'يبدأ الشهر الجديد في ${fmtDate(isoDate(end.add(const Duration(days: 1))))}.'),
                   style: Theme.of(c).textTheme.bodySmall),
-            ]),
+              const SizedBox(height: 18),
+              Text(tx('This month\'s figures', 'أرقام هذا الشهر'), style: Theme.of(c).textTheme.titleSmall!.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(tx('Optional. Leave empty if you do not have them yet and fill them in later from the Archive.',
+                  'اختياري. اتركها فارغة إذا لم تتوفر بعد واملأها لاحقاً من الأرشيف.'),
+                  style: Theme.of(c).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              MonthStatFields(controllers: stats),
+             ]),
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tx('Cancel', 'إلغاء'))),
@@ -256,67 +270,10 @@ class _OpenMonthCard extends StatelessWidget {
       ),
     );
     if (ok != true) return;
-    final m = store.closeMonth(to: isoDate(end));
+    final m = store.closeMonth(to: isoDate(end), stats: readMonthStats(stats));
     if (context.mounted) {
-      toast(context, tx('${monthTitle(m.from, m.to)} saved. A new month has started.', 'حُفظ ${monthTitle(m.from, m.to)}. بدأ شهر جديد.'));
+      toast(context, tx('${monthName(m.from, m.to)} is in the Archive. A new month has started.', 'حُفظ ${monthName(m.from, m.to)} في الأرشيف. بدأ شهر جديد.'));
     }
-  }
-}
-
-/// A saved month, read-only, with Excel export and (for the latest one) reopen.
-class ClosedMonthScreen extends StatelessWidget {
-  const ClosedMonthScreen({super.key, required this.store, required this.month});
-  final WarehouseStore store;
-  final MonthClose month;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = month;
-    final title = monthTitle(m.from, m.to);
-    final moved = m.rows.where(rowMoved).toList();
-    final isLast = store.monthCloses.isNotEmpty && identical(store.monthCloses.last, m);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: [
-          IconButton(
-            tooltip: tx('Export to Excel', 'تصدير إلى إكسل'),
-            icon: const Icon(Icons.table_view_outlined),
-            onPressed: () => _exportMonth(title, 'month-${m.from}.xlsx', m.rows),
-          ),
-          if (isLast)
-            PopupMenuButton<String>(
-              onSelected: (_) async {
-                if (await confirm(
-                    context,
-                    tx('Reopen $title?', 'إعادة فتح $title؟'),
-                    tx('The saved figures for this month are removed and it becomes the open month again.',
-                        'تُحذف الأرقام المحفوظة لهذا الشهر ويعود الشهر المفتوح.'),
-                    action: tx('Reopen', 'إعادة فتح'))) {
-                  store.reopenLastMonth();
-                  if (context.mounted) Navigator.pop(context);
-                }
-              },
-              itemBuilder: (_) => [PopupMenuItem(value: 'reopen', child: Text(tx('Reopen this month', 'إعادة فتح هذا الشهر')))],
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: PageBody(children: [
-        TileGrid(children: [
-          MetricTile(label: tx('Spent', 'المصروف'), value: fmtQty(m.issued), icon: Icons.outbox_outlined, hint: tx('Units · ${m.receipts} receipts', 'وحدة · ${m.receipts} وصل')),
-          MetricTile(label: tx('Received', 'الوارد'), value: fmtQty(m.received), icon: Icons.move_to_inbox_outlined, hint: tx('Units bought', 'وحدة مشتراة')),
-          MetricTile(label: tx('Items moved', 'مواد تحركت'), value: '${moved.length}', icon: Icons.swap_vert, hint: tx('of ${m.rows.length} items', 'من ${m.rows.length} مادة')),
-          MetricTile(
-              label: tx('Closed on', 'أُغلق في'),
-              value: m.closedAt.length >= 10 ? fmtDate(m.closedAt.substring(0, 10)) : '—',
-              icon: Icons.event_available,
-              hint: monthTitle(m.from, m.to)),
-        ]),
-        SectionTitle(tx('Items', 'المواد'), trailing: Text('${m.rows.length}')),
-        MonthTable(store: store, rows: [...moved, ...m.rows.where((r) => !rowMoved(r))], emptyText: tx('No items.', 'لا توجد مواد.')),
-      ]),
-    );
   }
 }
 

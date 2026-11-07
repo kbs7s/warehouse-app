@@ -6,7 +6,8 @@ import '../pdf.dart';
 import '../shell.dart';
 import '../store.dart';
 import '../ui.dart';
-import 'receipt_screens.dart';
+import 'archive_screens.dart';
+import 'send_file.dart';
 
 /// What one department took in a period.
 class DeptUse {
@@ -20,7 +21,7 @@ class DeptUse {
 /// Every department's issues between two dates (both included), most items first.
 List<DeptUse> departmentUse(WarehouseStore store, String from, String to) {
   final out = <String, DeptUse>{};
-  for (final r in store.receipts) {
+  for (final r in store.allReceipts) {
     final d = r.date;
     if (d == null || d.compareTo(from) < 0 || d.compareTo(to) > 0) continue;
     final name = (r.department?.trim().isEmpty ?? true) ? tx('No department', 'بدون قسم') : r.department!.trim();
@@ -114,7 +115,12 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         Padding(
           padding: const EdgeInsetsDirectional.only(end: 8),
           child: TextButton.icon(
-            onPressed: all.isEmpty ? null : () => shareDepartmentsPdf(s, _range.from, _range.to, reportTitle(_range)),
+            onPressed: all.isEmpty
+                ? null
+                : () => showPdfSheet(context,
+                    name: reportTitle(_range).replaceAll('/', '-'),
+                    make: () => buildDepartmentsPdf(s, _range.from, _range.to, reportTitle(_range)),
+                    print: () => shareDepartmentsPdf(s, _range.from, _range.to, reportTitle(_range))),
             icon: const Icon(Icons.picture_as_pdf_outlined),
             label: Text(tx('Report PDF', 'تقرير PDF')),
           ),
@@ -260,7 +266,7 @@ class _DepartmentDetailScreenState extends State<DepartmentDetailScreen> {
               for (final (i, r) in receipts.indexed) ...[
                 if (i > 0) const Divider(height: 1),
                 ListTile(
-                  onTap: () => openReceipt(context, s, r),
+                  onTap: () => openAnyReceipt(context, s, r),
                   leading: CircleAvatar(child: Text('${r.no}', style: const TextStyle(fontSize: 13))),
                   title: Text(fmtDate(r.date)),
                   subtitle: Text(tx('${r.lines.length} items${r.customer == null ? '' : ' · ${r.customer}'}',
