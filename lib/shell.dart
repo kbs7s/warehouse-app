@@ -41,26 +41,50 @@ class SubNav extends InheritedWidget {
   static PreferredSizeWidget? bar(BuildContext context) {
     final nav = context.dependOnInheritedWidgetOfExactType<SubNav>();
     if (nav == null || nav.labels.length < 2) return null;
+    // Tabs that sit on the bottom edge of the dark header; the open one joins the page below it.
+    final page = Theme.of(context).scaffoldBackgroundColor;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return PreferredSize(
-      preferredSize: const Size.fromHeight(52),
-      child: SizedBox(
-        height: 52,
+      preferredSize: const Size.fromHeight(50),
+      child: Container(
+        height: 50,
         width: double.infinity,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(children: [
-            for (final (i, l) in nav.labels.indexed)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(l, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  selected: i == nav.index,
-                  showCheckmark: false,
-                  onSelected: (_) => nav.onSelect(i),
-                ),
-              ),
-          ]),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Color(0x1AFFFFFF))),
+        ),
+        // Chips paint on a canvas-coloured Material; clear it so closed tabs sit on the header.
+        child: Theme(
+          data: Theme.of(context).copyWith(canvasColor: Colors.transparent),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.only(start: 12, end: 12, top: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final (i, l) in nav.labels.indexed)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 4),
+                    child: ChoiceChip(
+                      label: Text(l),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: i == nav.index ? (dark ? const Color(0xFF5EEAD4) : const Color(0xFF134E4A)) : const Color(0xFFCCFBF1),
+                      ),
+                      selected: i == nav.index,
+                      showCheckmark: false,
+                      color: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? page : Colors.transparent),
+                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onSelected: (_) => nav.onSelect(i),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'item_picker.dart';
 
@@ -14,7 +15,7 @@ class EquipmentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tx('Surgery equipment', 'معدات العمليات')), bottom: SubNav.bar(context)),
+        appBar: HeaderBar(title: Text(tx('Surgery equipment', 'معدات العمليات')), bottom: SubNav.bar(context)),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(context, null),
           icon: const Icon(Icons.add),

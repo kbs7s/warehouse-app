@@ -35,7 +35,7 @@ class _StockScreenState extends State<StockScreen> {
     final spendCols = MediaQuery.sizeOf(context).width >= 900;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Stock', 'المخزون')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Stock', 'المخزون')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => editItem(context, store, null),
         icon: const Icon(Icons.add),

@@ -33,7 +33,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     num sum(num Function(Payment) f) => all.fold<num>(0, (s, p) => s + f(p));
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Older bills', 'قوائم سابقة')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Older bills', 'قوائم سابقة')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),

@@ -61,7 +61,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.store, c = _count, items = _items, t = Theme.of(context), reserve = widget.reserve;
-    final appBar = AppBar(title: Text(reserve ? tx('Reserve count', 'جرد الاحتياط') : tx('Stock count', 'الجرد')), bottom: SubNav.bar(context));
+    final appBar = HeaderBar(title: Text(reserve ? tx('Reserve count', 'جرد الاحتياط') : tx('Stock count', 'الجرد')), bottom: SubNav.bar(context));
     if (c == null) {
       return Scaffold(
         appBar: appBar,
@@ -230,7 +230,7 @@ class _CountReviewState extends State<_CountReview> {
     String? deptOf(String id) => _dept[id] ?? _all;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Count differences', 'فروقات الجرد'))),
+      appBar: HeaderBar(title: Text(tx('Count differences', 'فروقات الجرد'))),
       body: PageBody(maxWidth: 860, children: [
         Text(tx('${c.counted.length} items counted · ${short.length} short · ${over.length} over',
             'تم جرد ${c.counted.length} مادة · ${short.length} فيها نقص · ${over.length} فيها زيادة'),

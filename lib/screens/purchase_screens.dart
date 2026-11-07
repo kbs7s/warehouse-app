@@ -38,7 +38,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     final unpaid = store.purchases.where((p) => p.owed > 0).length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Purchases', 'المشتريات')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Purchases', 'المشتريات')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openPurchase(context, widget.store, null),
         icon: const Icon(Icons.add),
@@ -208,7 +208,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: HeaderBar(
       title: Text(widget.existing == null
           ? tx('New purchase', 'شراء جديد')
           : tx('Purchase #${widget.existing!.no}', 'شراء رقم ${widget.existing!.no}')),

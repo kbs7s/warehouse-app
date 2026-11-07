@@ -80,7 +80,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final overdue = s.overdue(today);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Invoices', 'الفواتير')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Invoices', 'الفواتير')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openInvoice(context, s, null),
         icon: const Icon(Icons.add),
@@ -194,7 +194,7 @@ class InvoiceDetail extends StatelessWidget {
     final phone = isPhone(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(tx('Invoice #${inv.no}', 'فاتورة رقم ${inv.no}')),
         actions: [
           IconButton(tooltip: tx('Print or share PDF', 'طباعة أو مشاركة PDF'), icon: const Icon(Icons.ios_share), onPressed: () => shareInvoicePdf(store, inv)),
@@ -549,7 +549,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     final cost = _cost, profit = _total - cost;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(ex == null ? tx('New invoice', 'فاتورة جديدة') : tx('Edit invoice #${ex!.no}', 'تعديل الفاتورة رقم ${ex!.no}')),
         actions: [
           Padding(padding: const EdgeInsets.only(right: 12), child: FilledButton(onPressed: _save, child: Text(tx('Save', 'حفظ')))),

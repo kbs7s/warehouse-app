@@ -25,7 +25,7 @@ class ItemDetailScreen extends StatelessWidget {
           final avg = avgMonthlyUse(store.monthlyIssued()[itemId], DateTime.now());
           final t = Theme.of(context);
           return Scaffold(
-            appBar: AppBar(
+            appBar: HeaderBar(
               title: NameText(s.item.name),
               actions: [
                 TextButton.icon(
@@ -257,7 +257,7 @@ class _ItemFormState extends State<_ItemForm> {
         );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         leading: IconButton(tooltip: tx('Cancel', 'إلغاء'), icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
         title: Text(isNew ? tx('New item', 'مادة جديدة') : tx('Edit item', 'تعديل المادة')),
         actions: [

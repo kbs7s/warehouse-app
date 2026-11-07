@@ -144,7 +144,7 @@ class _ExpiryScreenState extends State<ExpiryScreen> {
     final list = [for (final e in base) if (q.isEmpty || e.item.name.toLowerCase().contains(q) || e.item.id.toLowerCase().contains(q)) e];
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Expiry dates', 'تواريخ الانتهاء')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Expiry dates', 'تواريخ الانتهاء')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final id = await pickItem(context, s);

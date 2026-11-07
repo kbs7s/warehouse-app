@@ -63,8 +63,11 @@ class StatusChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: .14), borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: color.withValues(alpha: .35))),
+      child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
     );
   }
 }
@@ -76,8 +79,11 @@ Future<bool> confirm(BuildContext context, String title, String message, {String
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tx('Cancel', 'إلغاء'))),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(action ?? tx('Delete', 'حذف'))),
+          OutlinedButton(onPressed: () => Navigator.pop(c, false), child: Text(tx('Cancel', 'إلغاء'))),
+          FilledButton(
+              style: action == null ? FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48)) : null,
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(action ?? tx('Delete', 'حذف'))),
         ],
       ),
     ) ??
@@ -194,15 +200,15 @@ class MetricTile extends StatelessWidget {
               ],
               Expanded(
                   child: Text(label,
-                      style: t.textTheme.labelLarge!.copyWith(color: t.colorScheme.onSurfaceVariant),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis)),
             ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Text(value,
-                  style: t.textTheme.headlineSmall!.copyWith(fontWeight: FontWeight.w800, color: color)),
+                  style: t.textTheme.headlineSmall!.copyWith(fontSize: 24, fontWeight: FontWeight.w800, color: color ?? t.colorScheme.onSurface)),
             ),
             if (hint != null) ...[
               const SizedBox(height: 4),
@@ -241,14 +247,21 @@ class SectionTitle extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 24, bottom: 10),
-        child: Row(children: [
-          Expanded(
-              child: Text(text, style: Theme.of(context).textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w700))),
-          ?trailing,
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      child: Row(children: [
+        // The coloured pill marker from the design guide.
+        Container(width: 10, height: 24, decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(99))),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(text,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: t.brightness == Brightness.dark ? const Color(0xFFE2E8F0) : AppColors.dark))),
+        ?trailing,
+      ]),
+    );
+  }
 }
 
 class EmptyState extends StatelessWidget {

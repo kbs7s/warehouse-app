@@ -66,7 +66,7 @@ class SettingsScreen extends StatelessWidget {
     final last = store.lastBackupAt == null ? null : DateTime.tryParse(store.lastBackupAt!);
     final days = last == null ? null : DateTime.now().difference(last).inDays;
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Backup & settings', 'النسخ الاحتياطي والإعدادات')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Backup & settings', 'النسخ الاحتياطي والإعدادات')), bottom: SubNav.bar(context)),
       body: PageBody(maxWidth: 860, children: [
         Card(
           child: Padding(

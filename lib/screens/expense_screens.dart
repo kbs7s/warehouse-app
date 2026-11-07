@@ -34,7 +34,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final cats = byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Expenses', 'المصاريف')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Expenses', 'المصاريف')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openExpense(context, s, null),
         icon: const Icon(Icons.add),

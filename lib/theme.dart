@@ -1,12 +1,23 @@
 import 'package:flutter/material.dart';
 
-/// Brand colours used across the app (cards, charts, status).
+/// Brand colours used across the app (cards, charts, status), from the hospital design guide.
 class AppColors {
-  static const brand = Color(0xFF0F766E); // deep teal
-  static const good = Color(0xFF16A34A);
-  static const warn = Color(0xFFD97706);
-  static const bad = Color(0xFFDC2626);
+  static const brand = Color(0xFF0F766E); // teal-700: the guide's teal-600 is too light for white text (3.7:1)
+  static const save = Color(0xFF2563EB); // blue-600, save / open
+  static const good = Color(0xFF059669); // emerald-600, print / success
+  static const warn = Color(0xFFD97706); // amber-600, bills / warnings
+  static const bad = Color(0xFFBE123C); // rose-700, delete
   static const info = Color(0xFF2563EB);
+  static const dark = Color(0xFF1E293B); // slate-800, table heads
+  static const page = Color(0xFFF1F5F9); // slate-100, page background
+  static const ink = Color(0xFF0F172A); // slate-900, text
+  static const muted = Color(0xFF64748B); // slate-500
+  static const label = Color(0xFF475569); // slate-600
+  static const line = Color(0xFFE2E8F0); // slate-200
+  static const field = Color(0xFFCBD5E1); // slate-300
+
+  /// The header: slate-900 → teal-900 → cyan-900, from the reading side.
+  static const header = [Color(0xFF0F172A), Color(0xFF134E4A), Color(0xFF164E63)];
 }
 
 /// Status colours that stay readable as text in both light and dark mode
@@ -33,26 +44,92 @@ const accentChoices = <(String, String, Color)>[
 /// The colour chosen on this device; set by the app before each build.
 Color appAccent = AppColors.brand;
 
-/// Background of the big coloured cards (home and month), from the chosen colour.
-List<Color> heroGradient() => [
-      appAccent,
-      Color.lerp(appAccent, Colors.black, .18)!,
-      Color.lerp(appAccent, Colors.black, .32)!,
-    ];
+/// Background of the big coloured cards (home and month): the header gradient, or the chosen
+/// colour when it is not the standard teal.
+List<Color> heroGradient() => appAccent == accentChoices.first.$3
+    ? AppColors.header.reversed.toList()
+    : [Color.lerp(appAccent, Colors.black, .32)!, Color.lerp(appAccent, Colors.black, .18)!, appAccent];
+
+/// The dark gradient header of every page, with white title and icons.
+class HeaderBar extends AppBar {
+  HeaderBar({super.key, super.leading, super.automaticallyImplyLeading, super.title, List<Widget>? actions, super.bottom, super.centerTitle})
+      : super(
+          actions: actions == null ? null : [for (final a in actions) OnHeader(child: a)],
+          flexibleSpace: const _HeaderGradient(),
+          backgroundColor: AppColors.header[1],
+          foregroundColor: Colors.white,
+        );
+}
+
+class _HeaderGradient extends StatelessWidget {
+  const _HeaderGradient();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+          // "to left" in the design: dark slate at the reading start.
+          gradient: LinearGradient(
+            begin: AlignmentDirectional.centerStart.resolve(Directionality.of(context)),
+            end: AlignmentDirectional.centerEnd.resolve(Directionality.of(context)),
+            colors: AppColors.header,
+          ),
+          boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 15, offset: Offset(0, 10), spreadRadius: -3)],
+        ),
+      );
+}
+
+/// Buttons placed on the dark header: white text and icons, glass-style filled buttons.
+class OnHeader extends StatelessWidget {
+  const OnHeader({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final glass = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0x26FFFFFF)));
+    return Theme(
+      data: t.copyWith(
+        iconTheme: const IconThemeData(color: Colors.white),
+        iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: Colors.white)),
+        textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+                foregroundColor: Colors.white, backgroundColor: const Color(0x1AFFFFFF), shape: glass, textStyle: const TextStyle(fontWeight: FontWeight.w700))),
+        filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brand,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+        popupMenuTheme: t.popupMenuTheme,
+      ),
+      child: IconTheme(data: const IconThemeData(color: Colors.white), child: child),
+    );
+  }
+}
 
 ThemeData buildTheme([Brightness brightness = Brightness.light, Color? seed]) {
   final dark = brightness == Brightness.dark;
-  final scheme = ColorScheme.fromSeed(
-    seedColor: seed ?? AppColors.brand,
-    brightness: brightness,
-    surface: dark ? const Color(0xFF0E1416) : const Color(0xFFF3F6F6),
+  final primary = seed ?? AppColors.brand;
+  final page = dark ? const Color(0xFF0B1220) : AppColors.page;
+  final card = dark ? const Color(0xFF111A2B) : Colors.white;
+  final line = dark ? const Color(0xFF243247) : AppColors.line;
+  final scheme = ColorScheme.fromSeed(seedColor: primary, brightness: brightness).copyWith(
+    primary: dark ? Color.lerp(primary, Colors.white, .25) : primary,
+    onPrimary: Colors.white,
+    surface: page,
+    onSurface: dark ? const Color(0xFFE2E8F0) : AppColors.ink,
+    onSurfaceVariant: dark ? const Color(0xFF94A3B8) : AppColors.muted,
+    outline: dark ? const Color(0xFF475569) : AppColors.field,
+    outlineVariant: line,
+    surfaceContainerHighest: dark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
   );
   final themed = ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    fontFamily: 'NotoSans',
-    fontFamilyFallback: const ['NotoSansArabic'],
-    scaffoldBackgroundColor: scheme.surface,
+    fontFamily: 'Cairo',
+    fontFamilyFallback: const ['NotoSansArabic', 'NotoSans'],
+    scaffoldBackgroundColor: page,
     visualDensity: VisualDensity.standard,
   );
   // Same-width digits everywhere, so quantities and money line up in tables and tiles.
@@ -67,70 +144,112 @@ ThemeData buildTheme([Brightness brightness = Brightness.light, Color? seed]) {
       headlineMedium: t.headlineMedium?.merge(digits),
       headlineSmall: t.headlineSmall?.merge(digits),
       titleLarge: t.titleLarge?.merge(digits),
-      titleMedium: t.titleMedium?.merge(digits),
-      titleSmall: t.titleSmall?.merge(digits),
-      bodyLarge: t.bodyLarge?.merge(digits),
-      bodyMedium: t.bodyMedium?.merge(digits),
+      titleMedium: t.titleMedium?.merge(digits).copyWith(fontWeight: FontWeight.w700),
+      titleSmall: t.titleSmall?.merge(digits).copyWith(fontWeight: FontWeight.w700),
+      bodyLarge: t.bodyLarge?.merge(digits).copyWith(fontWeight: FontWeight.w600),
+      bodyMedium: t.bodyMedium?.merge(digits).copyWith(fontWeight: FontWeight.w600),
       bodySmall: t.bodySmall?.merge(digits),
-      labelLarge: t.labelLarge?.merge(digits),
-      labelMedium: t.labelMedium?.merge(digits),
+      labelLarge: t.labelLarge?.merge(digits).copyWith(fontWeight: FontWeight.w700),
+      labelMedium: t.labelMedium?.merge(digits).copyWith(fontWeight: FontWeight.w700),
       labelSmall: t.labelSmall?.merge(digits),
     ),
   );
-  final radius = BorderRadius.circular(18);
+  final r12 = BorderRadius.circular(12), r16 = BorderRadius.circular(16);
+  ButtonStyle solid(Color bg) => FilledButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: r12),
+        textStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700, fontSize: 14),
+        elevation: 0,
+      );
   return base.copyWith(
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
+      backgroundColor: AppColors.header[1],
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      actionsIconTheme: const IconThemeData(color: Colors.white),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       toolbarHeight: 64,
-      // base.textTheme carries colors only (sizes are merged in later), so sizes are set here.
-      titleTextStyle: base.textTheme.headlineSmall!.copyWith(fontSize: 24, fontWeight: FontWeight.w800, color: scheme.onSurface, letterSpacing: -.3),
+      titleTextStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: .5),
     ),
     cardTheme: CardThemeData(
-      elevation: dark ? 0 : 1.5,
-      shadowColor: const Color(0x2A0F3D3A),
-      color: dark ? const Color(0xFF162024) : Colors.white,
+      elevation: 0,
+      color: card,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: dark ? BorderSide(color: scheme.outlineVariant.withValues(alpha: .5)) : BorderSide.none),
+      shape: RoundedRectangleBorder(borderRadius: r16, side: BorderSide(color: line.withValues(alpha: .8))),
       margin: EdgeInsets.zero,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: dark ? const Color(0xFF172024) : Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.outlineVariant)),
+      fillColor: dark ? const Color(0xFF0F172A) : Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700, color: dark ? const Color(0xFF94A3B8) : AppColors.label),
+      border: OutlineInputBorder(borderRadius: r12, borderSide: BorderSide(color: scheme.outline)),
+      enabledBorder: OutlineInputBorder(borderRadius: r12, borderSide: BorderSide(color: scheme.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: r12, borderSide: const BorderSide(color: Color(0xFF14B8A6), width: 2)),
       isDense: true,
     ),
-    filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 46),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+    filledButtonTheme: FilledButtonThemeData(style: solid(scheme.primary)),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: solid(AppColors.save)),
     outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+            minimumSize: const Size(0, 44),
+            backgroundColor: dark ? const Color(0xFF1E293B) : AppColors.page,
+            foregroundColor: dark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(borderRadius: r12),
+            textStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700, fontSize: 14))),
+    textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: r12), textStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700))),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+        foregroundColor: Colors.white,
+        elevation: 2,
+        extendedTextStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700, fontSize: 15),
+        shape: RoundedRectangleBorder(borderRadius: r16)),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: dark ? const Color(0xFF131A1D) : Colors.white,
-      indicatorColor: scheme.primaryContainer,
-      labelTextStyle: WidgetStatePropertyAll(base.textTheme.labelMedium!.copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
+      backgroundColor: card,
+      indicatorColor: dark ? const Color(0xFF134E4A) : const Color(0xFFCCFBF1),
+      labelTextStyle: WidgetStatePropertyAll(base.textTheme.labelMedium!.copyWith(fontSize: 12, fontWeight: FontWeight.w700)),
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: dark ? const Color(0xFF131A1D) : Colors.white,
-      indicatorColor: scheme.primaryContainer,
+      backgroundColor: card,
+      indicatorColor: dark ? const Color(0xFF134E4A) : const Color(0xFFCCFBF1),
+      selectedLabelTextStyle: TextStyle(fontWeight: FontWeight.w800, color: dark ? const Color(0xFF5EEAD4) : const Color(0xFF134E4A)),
+      unselectedLabelTextStyle: TextStyle(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
     ),
-    dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: .5), space: 1),
+    dialogTheme: DialogThemeData(
+      backgroundColor: card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: r16),
+      titleTextStyle: TextStyle(fontFamily: 'Cairo', fontSize: 18, fontWeight: FontWeight.w800, color: scheme.onSurface),
+    ),
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.dark,
+      contentTextStyle: const TextStyle(fontFamily: 'Cairo', color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+      shape: RoundedRectangleBorder(borderRadius: r12, side: const BorderSide(color: Color(0xFF475569))),
+    ),
+    dividerTheme: DividerThemeData(color: line, space: 1),
     listTileTheme: const ListTileThemeData(minVerticalPadding: 10),
-    chipTheme: base.chipTheme.copyWith(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+    chipTheme: base.chipTheme.copyWith(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
+      // Filter pills: the chosen one is filled with the main colour, the rest match the page.
+      labelStyle: TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w700,
+          color: WidgetStateColor.resolveWith((st) => st.contains(WidgetState.selected) ? (dark ? AppColors.ink : Colors.white) : scheme.onSurface)),
+      color: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? (dark ? const Color(0xFF5EEAD4) : scheme.primary) : page),
+      checkmarkColor: dark ? AppColors.ink : Colors.white,
+      side: WidgetStateBorderSide.resolveWith((st) => BorderSide(color: st.contains(WidgetState.selected) ? (dark ? const Color(0xFF5EEAD4) : scheme.primary) : line)),
+    ),
     tabBarTheme: TabBarThemeData(dividerColor: Colors.transparent, labelStyle: base.textTheme.titleSmall!.copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
   );
 }

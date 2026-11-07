@@ -35,7 +35,7 @@ class _ReserveScreenState extends State<ReserveScreen> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Reserve store', 'مخزن الاحتياط')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Reserve store', 'مخزن الاحتياط')), bottom: SubNav.bar(context)),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.bad,
         foregroundColor: Colors.white,
@@ -107,7 +107,7 @@ class TransfersScreen extends StatelessWidget {
     final list = [...store.transfers]..sort((a, b) => b.date.compareTo(a.date) != 0 ? b.date.compareTo(a.date) : b.no.compareTo(a.no));
     final emergencies = store.receipts.where((r) => r.fromReserve).toList().reversed.toList();
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Moves', 'النقل')), bottom: SubNav.bar(context)),
+      appBar: HeaderBar(title: Text(tx('Moves', 'النقل')), bottom: SubNav.bar(context)),
       body: PageBody(children: [
         SectionTitle(tx('Between the stores', 'بين المخزنين')),
         if (list.isEmpty)

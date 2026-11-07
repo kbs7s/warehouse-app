@@ -4,6 +4,7 @@ import '../changes.dart';
 import '../l10n.dart';
 import '../store.dart';
 import '../sync.dart';
+import '../theme.dart';
 import '../ui.dart';
 
 IconData changeIcon(ChangeKind k) => switch (k) {
@@ -43,7 +44,7 @@ class _ChangesScreenState extends State<ChangesScreen> {
   Widget build(BuildContext context) {
     final c = _cloud;
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Changes', 'التغييرات'))),
+      appBar: HeaderBar(title: Text(tx('Changes', 'التغييرات'))),
       body: c == null
           ? const SizedBox.shrink()
           : ListenableBuilder(

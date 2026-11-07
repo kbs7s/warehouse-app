@@ -5,6 +5,7 @@ import '../models.dart';
 import '../pdf.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'archive_screens.dart';
 import 'send_file.dart';
@@ -111,7 +112,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     final items = {for (final d in all) ...d.qty.keys}.length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tx('Departments', 'الأقسام')), bottom: SubNav.bar(context), actions: [
+      appBar: HeaderBar(title: Text(tx('Departments', 'الأقسام')), bottom: SubNav.bar(context), actions: [
         Padding(
           padding: const EdgeInsetsDirectional.only(end: 8),
           child: TextButton.icon(
@@ -216,7 +217,7 @@ class _DepartmentDetailScreenState extends State<DepartmentDetailScreen> {
     final receipts = [...d.receipts]..sort((a, b) => (b.date ?? '').compareTo(a.date ?? ''));
 
     return Scaffold(
-      appBar: AppBar(title: NameText(widget.name)),
+      appBar: HeaderBar(title: NameText(widget.name)),
       body: PageBody(children: [
         _RangeChips(range: _range, onChanged: (r) => setState(() => _range = r)),
         const SizedBox(height: 14),

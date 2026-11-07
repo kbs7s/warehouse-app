@@ -5,6 +5,7 @@ import '../l10n.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../store.dart';
+import '../theme.dart';
 import '../ui.dart';
 import 'item_screens.dart';
 
@@ -26,7 +27,7 @@ class ReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) => DefaultTabController(
         length: 2,
         child: Scaffold(
-          appBar: AppBar(
+          appBar: HeaderBar(
             title: Text(tx('Reports', 'التقارير')),
             actions: [
               Padding(
@@ -228,7 +229,7 @@ class ReorderScreen extends StatelessWidget {
           ]),
         );
     return Scaffold(
-      appBar: AppBar(
+      appBar: HeaderBar(
         title: Text(tx('Reorder', 'إعادة الطلب')),
         bottom: SubNav.bar(context),
         actions: [
