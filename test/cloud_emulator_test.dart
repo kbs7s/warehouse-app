@@ -87,6 +87,14 @@ void main() {
     expect(ownerStore.item('P001')!.minLevel, 0);
     expect(ownerStore.receipts.map((r) => r.department), contains('ER'));
 
+    // The owner was told about what the staff member did, credited to them by name.
+    final told = [for (final c in owner.changes) '${c.by}: ${c.en}'];
+    expect(told, contains('Ali: Issue #3 to ER · 1 item'));
+    expect(told.where((t) => t.contains('Gloves')), isEmpty); // the undone item edit never arrived
+    expect(owner.unread, greaterThan(0));
+    await owner.markRead();
+    expect(owner.unread, 0);
+
     // Removing a member locks them out.
     await owner.client!.removeMember('staff@example.com');
     staff.member = null;

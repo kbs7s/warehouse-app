@@ -16,6 +16,7 @@ import 'item_screens.dart';
 import 'purchase_screens.dart';
 import 'receipt_screens.dart';
 import 'reports_screen.dart' show reorderList;
+import 'changes_screen.dart';
 import 'cloud_screens.dart';
 import 'settings_screen.dart';
 
@@ -129,6 +130,7 @@ class HomeScreen extends StatelessWidget {
             onIssue: () => openReceipt(context, s, null),
             onPurchase: () => openPurchase(context, s, null),
             trailing: [
+              ChangesBell(store: s, color: Colors.white),
               SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
               if (w < 700) ...[
                     _HeroIcon(Icons.warehouse_outlined, tx('Reserve store', 'مخزن الاحتياط'), () => shell.go('Reserve')),
@@ -278,6 +280,10 @@ class _Hero extends StatelessWidget {
       icon: const Icon(Icons.add_shopping_cart),
       label: Text(tx('Record purchase', 'تسجيل شراء')),
     );
+    final date = Text(fmtDate(todayIso()), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600));
+    final greetingText =
+        Text(greeting, style: t.textTheme.headlineMedium!.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -.5));
+    final nameText = NameText(name, style: t.textTheme.titleMedium!.copyWith(color: Colors.white.withValues(alpha: .9)));
     return Container(
       padding: EdgeInsets.all(phone ? 20 : 28),
       decoration: BoxDecoration(
@@ -290,18 +296,29 @@ class _Hero extends StatelessWidget {
         boxShadow: const [BoxShadow(color: Color(0x330F766E), blurRadius: 24, offset: Offset(0, 10))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(fmtDate(todayIso()), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Text(greeting, style: t.textTheme.headlineMedium!.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -.5)),
-              const SizedBox(height: 2),
-              NameText(name, style: t.textTheme.titleMedium!.copyWith(color: Colors.white.withValues(alpha: .9))),
-            ]),
-          ),
-          ...trailing,
-        ]),
+        // Phones put the date beside the round buttons, so the greeting keeps the full width.
+        if (phone) ...[
+          Row(children: [
+            Expanded(child: date),
+            ...trailing,
+          ]),
+          const SizedBox(height: 4),
+          greetingText,
+          const SizedBox(height: 2),
+          nameText,
+        ] else
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                date,
+                const SizedBox(height: 6),
+                greetingText,
+                const SizedBox(height: 2),
+                nameText,
+              ]),
+            ),
+            ...trailing,
+          ]),
         SizedBox(height: phone ? 20 : 26),
         if (phone)
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [issue, const SizedBox(height: 10), purchase])
