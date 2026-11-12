@@ -26,6 +26,7 @@ class WarehouseStore extends ChangeNotifier {
   List<Customer> customers = [];
   List<String> suppliers = [];
   List<Receipt> receipts = [];
+  List<StoreRequest> requests = []; // what departments asked for
   List<Transfer> transfers = []; // between the main and reserve stores
   StockCount? stockCount; // a count in progress
   StockCount? reserveCount; // a count of the reserve store in progress
@@ -144,6 +145,7 @@ class WarehouseStore extends ChangeNotifier {
     customers = [];
     suppliers = [];
     receipts = [];
+    requests = [];
     transfers = [];
     stockCount = null;
     reserveCount = null;
@@ -175,6 +177,7 @@ class WarehouseStore extends ChangeNotifier {
     customers = list('customers').map(Customer.fromJson).toList();
     suppliers = [for (final s in (j['suppliers'] as List? ?? [])) s as String];
     receipts = list('receipts').map(Receipt.fromJson).toList();
+    requests = list('requests').map(StoreRequest.fromJson).toList();
     transfers = list('transfers').map(Transfer.fromJson).toList();
     stockCount = j['stockCount'] == null ? null : StockCount.fromJson((j['stockCount'] as Map).cast<String, dynamic>());
     reserveCount = j['reserveCount'] == null ? null : StockCount.fromJson((j['reserveCount'] as Map).cast<String, dynamic>());
@@ -207,6 +210,7 @@ class WarehouseStore extends ChangeNotifier {
         'customers': [for (final c in customers) c.toJson()],
         'suppliers': suppliers,
         'receipts': [for (final r in receipts) r.toJson()],
+        'requests': [for (final r in requests) r.toJson()],
         'transfers': [for (final t in transfers) t.toJson()],
         if (stockCount != null) 'stockCount': stockCount!.toJson(),
         if (reserveCount != null) 'reserveCount': reserveCount!.toJson(),
@@ -419,6 +423,37 @@ class WarehouseStore extends ChangeNotifier {
   void saveItem(Item item) {
     final idx = items.indexWhere((i) => i.id == item.id);
     idx < 0 ? items.add(item) : items[idx] = item;
+    _changed();
+  }
+
+  // ---------- Department requests ----------
+
+  int get nextRequestNo => requests.fold<int>(0, (m, r) => r.no > m ? r.no : m) + 1;
+
+  /// Requests the store has not answered yet, oldest first.
+  List<StoreRequest> get openRequests => [for (final r in requests) if (r.open) r];
+
+  void saveRequest(StoreRequest r) {
+    r.by = cloud?.who ?? r.by;
+    r.at ??= DateTime.now().toUtc().toIso8601String();
+    requests.removeWhere((x) => x.no == r.no);
+    requests.add(r);
+    requests.sort((a, b) => a.no.compareTo(b.no));
+    _changed();
+  }
+
+  void deleteRequest(int no) {
+    requests.removeWhere((r) => r.no == no);
+    _changed();
+  }
+
+  /// Marks a request answered: issued with [receipt], or turned down when there is none.
+  void closeRequest(int no, {Receipt? receipt}) {
+    for (final r in requests.where((r) => r.no == no)) {
+      r.status = receipt == null ? 'rejected' : 'done';
+      r.receiptNo = receipt?.no;
+      r.given = receipt == null ? null : [for (final l in receipt.lines) ReceiptLine(itemId: l.itemId, qty: l.qty)];
+    }
     _changed();
   }
 

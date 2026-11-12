@@ -350,7 +350,7 @@ class _TeamScreenState extends State<TeamScreen> {
   }
 
   Future<void> _add() async {
-    final added = await showDialog<bool>(context: context, builder: (_) => _AddMemberDialog(client: _client));
+    final added = await showDialog<bool>(context: context, builder: (_) => _AddMemberDialog(client: _client, departments: widget.store.departments));
     if (added == true) _load();
   }
 
@@ -394,7 +394,7 @@ class _TeamScreenState extends State<TeamScreen> {
                 ListTile(
                   leading: CircleAvatar(child: Icon(m.isOwner ? Icons.verified_user_outlined : Icons.person_outline)),
                   title: Text(m.name.isEmpty ? m.email : m.name),
-                  subtitle: Text('${m.email} · ${m.isOwner ? tx('Owner', 'المالك') : tx('Team member', 'عضو')}'),
+                  subtitle: Text('${m.email} · ${m.isOwner ? tx('Owner', 'المالك') : m.isDept ? tx('Department: ${m.department}', 'قسم: ${m.department}') : tx('Team member', 'عضو')}'),
                   trailing: m.email == me
                       ? Text(tx('You', 'أنت'))
                       : IconButton(
@@ -409,8 +409,9 @@ class _TeamScreenState extends State<TeamScreen> {
 }
 
 class _AddMemberDialog extends StatefulWidget {
-  const _AddMemberDialog({required this.client});
+  const _AddMemberDialog({required this.client, required this.departments});
   final CloudClient client;
+  final List<String> departments;
 
   @override
   State<_AddMemberDialog> createState() => _AddMemberDialogState();
@@ -420,13 +421,15 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _owner = false;
+  String _role = 'staff';
+  String? _department;
   bool _busy = false;
   String? _error;
 
   Future<void> _save() async {
     final email = _email.text.trim().toLowerCase();
     if (email.isEmpty) return setState(() => _error = tx('Enter their email.', 'أدخل بريده الإلكتروني.'));
+    if (_role == 'dept' && (_department ?? '').isEmpty) return setState(() => _error = tx('Choose the department.', 'اختر القسم.'));
     setState(() {
       _busy = true;
       _error = null;
@@ -451,7 +454,7 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
           if (!ok) return;
         }
       }
-      await widget.client.setMember(Member(email: email, name: _name.text.trim(), role: _owner ? 'owner' : 'staff'));
+      await widget.client.setMember(Member(email: email, name: _name.text.trim(), role: _role, department: _role == 'dept' ? _department! : ''));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => _error = _err(e));
@@ -483,12 +486,21 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            CheckboxListTile(
-              value: _owner,
-              onChanged: (v) => setState(() => _owner = v ?? false),
-              contentPadding: EdgeInsets.zero,
-              title: Text(tx('Owner (can manage the team)', 'مالك (يدير الفريق)')),
-            ),
+            Wrap(spacing: 8, children: [
+              for (final (key, label) in [
+                ('staff', tx('Store staff (issues)', 'كادر المخزن (يصرف)')),
+                ('dept', tx('Department (sends requests)', 'قسم (يرسل طلبات)')),
+                ('owner', tx('Owner', 'مالك')),
+              ])
+                ChoiceChip(label: Text(label), selected: _role == key, onSelected: (_) => setState(() => _role = key)),
+            ]),
+            if (_role == 'dept') ...[
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 4, children: [
+                for (final d in widget.departments)
+                  ChoiceChip(label: NameText(d), selected: _department == d, showCheckmark: false, onSelected: (_) => setState(() => _department = d)),
+              ]),
+            ],
             if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.bad, fontWeight: FontWeight.w600)),
           ]),
         ),
@@ -520,8 +532,10 @@ class AccountScreen extends StatelessWidget {
           const SizedBox(height: 12),
           CloudCard(store: store),
           const SizedBox(height: 12),
-          Text(tx('Your account can issue supplies to departments. Ask the store owner for anything else.',
-              'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
+          Text((store.cloud?.isDept ?? false)
+              ? tx('This login sends requests to the store for ${store.cloud!.department}.', 'هذا الحساب يرسل طلبات إلى المخزن لقسم ${store.cloud!.department}.')
+              : tx('Your account can issue supplies to departments. Ask the store owner for anything else.',
+                  'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
         ]),
       );
 }

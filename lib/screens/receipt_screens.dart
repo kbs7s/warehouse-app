@@ -108,10 +108,13 @@ class _Line {
 }
 
 class ReceiptEditor extends StatefulWidget {
-  const ReceiptEditor({super.key, required this.store, this.existing, this.fromReserve = false});
+  const ReceiptEditor({super.key, required this.store, this.existing, this.fromReserve = false, this.request});
   final WarehouseStore store;
   final Receipt? existing;
   final bool fromReserve;
+
+  /// A department's request being answered: its department and items are filled in.
+  final StoreRequest? request;
 
   @override
   State<ReceiptEditor> createState() => _ReceiptEditorState();
@@ -122,10 +125,10 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
   late final _no = TextEditingController(text: '${widget.existing?.no ?? store.nextReceiptNo}');
   late String? _date = widget.existing?.date ?? todayIso();
   late bool _reserve = widget.existing?.fromReserve ?? widget.fromReserve;
-  late final _dept = TextEditingController(text: widget.existing?.department);
+  late final _dept = TextEditingController(text: widget.existing?.department ?? widget.request?.department);
   late final _person = TextEditingController(text: widget.existing?.customer);
   late final _note = TextEditingController(text: widget.existing?.note);
-  late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? <ReceiptLine>[]) _Line(l.itemId, l.qty)];
+  late final List<_Line> _lines = [for (final l in widget.existing?.lines ?? widget.request?.lines ?? <ReceiptLine>[]) _Line(l.itemId, l.qty)];
 
   /// Departments to pick from: the Settings list, most recently used first.
   late final List<String> _depts = () {
@@ -209,6 +212,7 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
       return;
     }
     store.saveReceipt(r, replacingNo: widget.existing?.no);
+    if (widget.request != null) store.closeRequest(widget.request!.no, receipt: r);
     if (!mounted) return;
     final nav = Navigator.of(context);
     nav.pop();
@@ -226,6 +230,16 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
         title: Text(widget.existing == null
             ? (_reserve ? tx('Emergency issue (reserve)', 'صرف طارئ من الاحتياط') : tx('New issue receipt', 'وصل صرف جديد'))
             : tx('Receipt #${widget.existing!.no}', 'وصل رقم ${widget.existing!.no}')),
+        bottom: widget.request == null
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(32),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(tx('Answering request #${widget.request!.no}: change the quantities to what you give.', 'إجابة الطلب رقم ${widget.request!.no}: عدّل الكميات إلى ما تصرفه فعلاً.'),
+                      style: const TextStyle(color: Colors.white)),
+                ),
+              ),
         actions: [
           if (widget.existing != null)
             IconButton(

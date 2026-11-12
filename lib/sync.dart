@@ -70,6 +70,10 @@ class CloudSync extends ChangeNotifier {
 
   /// Signed in as a team member who is not an owner: may only issue supplies.
   bool get isStaff => signedIn && !isOwner;
+
+  /// A department login: it only sends requests to the store.
+  bool get isDept => signedIn && (member?.isDept ?? false);
+  String get department => member?.department ?? '';
   CloudClient? get client => _client;
 
   /// Picks up a saved sign-in on this device.
@@ -95,7 +99,7 @@ class CloudSync extends ChangeNotifier {
     if (mail == null || token == null) return;
     _client = CloudClient(config, client: _http)
       ..user = CloudUser(email: mail, uid: '', idToken: '', refreshToken: token, expires: DateTime(2000));
-    if (j['role'] != null) member = Member(email: mail, role: j['role'] as String, name: (j['name'] as String?) ?? '');
+    if (j['role'] != null) member = Member(email: mail, role: j['role'] as String, name: (j['name'] as String?) ?? '', department: (j['department'] as String?) ?? '');
     state = SyncState.working;
     _startPolling();
     unawaited(syncNow());
@@ -226,10 +230,10 @@ class CloudSync extends ChangeNotifier {
           // Team members only issue supplies: anything else changed on their device is undone.
           final allowed = {
             ...jsonDecode(_base!) as Map<String, dynamic>,
-            for (final k in _staffKeys) k: local[k],
+            for (final k in isDept ? _deptKeys : _staffKeys) k: local[k],
           };
           // Issuing lowers the items' expiry batches (oldest first): that part of an item may change too.
-          final mine = {for (final i in (local['items'] as List? ?? const [])) '${(i as Map)['id']}': i};
+          final mine = isDept ? const <String, dynamic>{} : {for (final i in (local['items'] as List? ?? const [])) '${(i as Map)['id']}': i};
           allowed['items'] = [
             for (final i in (allowed['items'] as List? ?? const []))
               if (mine[(i as Map)['id']] == null)
@@ -350,7 +354,10 @@ class CloudSync extends ChangeNotifier {
   }
 
   /// What a team member's device may change: issues, and the departments and people named on them.
-  static const _staffKeys = ['receipts', 'departments', 'customers'];
+  static const _staffKeys = ['receipts', 'requests', 'departments', 'customers'];
+
+  /// A department login may only change the requests.
+  static const _deptKeys = ['requests'];
 
   static const _emptyData = {'format': 'warehouse-backup', 'version': 2, 'source': 'Shared online store'};
 
@@ -376,6 +383,7 @@ class CloudSync extends ChangeNotifier {
           'email': u.email,
           'refreshToken': u.refreshToken,
           if (member != null) 'role': member!.role,
+          if (member != null && member!.department.isNotEmpty) 'department': member!.department,
           if (member != null) 'name': member!.name,
         }));
   }

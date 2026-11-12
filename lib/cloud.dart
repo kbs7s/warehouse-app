@@ -52,11 +52,13 @@ class CloudUser {
 }
 
 class Member {
-  Member({required this.email, this.name = '', this.role = 'staff'});
+  Member({required this.email, this.name = '', this.role = 'staff', this.department = ''});
   final String email;
   final String name;
-  final String role; // 'owner' or 'staff'
+  final String role; // 'owner', 'staff', or 'dept' (a department that sends requests)
+  final String department; // for 'dept': the department this login asks for
   bool get isOwner => role == 'owner';
+  bool get isDept => role == 'dept';
 }
 
 /// The shared data as last saved online.
@@ -233,7 +235,7 @@ class CloudClient {
   Member _member(Map<String, dynamic> d) {
     final f = (d['fields'] as Map<String, dynamic>?) ?? {};
     String s(String k) => ((f[k] as Map?)?['stringValue'] as String?) ?? '';
-    return Member(email: Uri.decodeComponent((d['name'] as String).split('/').last), name: s('name'), role: s('role'));
+    return Member(email: Uri.decodeComponent((d['name'] as String).split('/').last), name: s('name'), role: s('role'), department: s('department'));
   }
 
   Future<void> setMember(Member m) async {
@@ -243,6 +245,7 @@ class CloudClient {
           'fields': {
             'name': {'stringValue': m.name},
             'role': {'stringValue': m.role},
+            if (m.department.isNotEmpty) 'department': {'stringValue': m.department},
           }
         })));
     if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);

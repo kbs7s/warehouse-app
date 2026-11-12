@@ -149,6 +149,49 @@ class Receipt {
       };
 }
 
+/// What a department asks the store for. The store turns it into an issue receipt.
+class StoreRequest {
+  StoreRequest({required this.no, this.date, this.department, this.note, List<ReceiptLine>? lines, this.status = 'open', this.given, this.receiptNo, this.by, this.at})
+      : lines = lines ?? [];
+  int no;
+  String? date; // yyyy-MM-dd
+  String? department;
+  String? note;
+  List<ReceiptLine> lines; // what was asked for
+  String status; // 'open', 'done' or 'rejected'
+  List<ReceiptLine>? given; // what the store issued for it
+  int? receiptNo; // the issue receipt made from it
+  String? by; // who asked
+  String? at; // when it was written
+
+  bool get open => status == 'open';
+
+  factory StoreRequest.fromJson(Map<String, dynamic> j) => StoreRequest(
+        no: (j['no'] as num).toInt(),
+        date: j['date'] as String?,
+        department: j['department'] as String?,
+        note: j['note'] as String?,
+        lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
+        status: (j['status'] as String?) ?? 'open',
+        given: j['given'] == null ? null : [for (final l in j['given'] as List) ReceiptLine.fromJson(l as Map<String, dynamic>)],
+        receiptNo: (j['receiptNo'] as num?)?.toInt(),
+        by: j['by'] as String?,
+        at: j['at'] as String?,
+      );
+  Map<String, dynamic> toJson() => {
+        'no': no,
+        'date': date,
+        'department': department,
+        if (note != null) 'note': note,
+        'lines': [for (final l in lines) {'itemId': l.itemId, 'qty': l.qty}],
+        'status': status,
+        if (given != null) 'given': [for (final l in given!) {'itemId': l.itemId, 'qty': l.qty}],
+        if (receiptNo != null) 'receiptNo': receiptNo,
+        if (by != null) 'by': by,
+        if (at != null) 'at': at,
+      };
+}
+
 /// Items moved between the main store and the reserve store.
 class Transfer {
   Transfer({required this.no, required this.date, required this.itemId, required this.qty, required this.toReserve});

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'l10n.dart';
 
 /// What kind of change, for the icon shown next to it.
-enum ChangeKind { issue, purchase, move, item, month, department, other }
+enum ChangeKind { issue, purchase, move, item, month, department, request, other }
 
 /// One change someone else made to the shared store, as shown in the Changes list.
 class StoreChange {
@@ -59,6 +59,25 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
       }),
       edited: (r) => add(ChangeKind.issue, 'Issue #${r['no']} edited', 'تعديل وصل الصرف رقم ${r['no']}', r),
       removed: unless(closing, (r) => add(ChangeKind.issue, 'Issue #${r['no']} deleted', 'حذف وصل الصرف رقم ${r['no']}')));
+
+  // Requests from departments.
+  final oldReqs = {for (final r in _list(before['requests'])) '${r['no']}': r};
+  _diff(before['requests'], after['requests'], (r) => '${r['no']}',
+      added: (r) {
+        final lines = (r['lines'] as List? ?? const []).length;
+        add(ChangeKind.request, 'Request #${r['no']} from ${r['department'] ?? ''} · $lines ${n(lines, 'item', 'items')}',
+            'طلب رقم ${r['no']} من ${r['department'] ?? ''} · $lines ${n(lines, 'مادة', 'مواد')}', r);
+      },
+      edited: (r) {
+        if (oldReqs['${r['no']}']?['status'] == r['status']) {
+          add(ChangeKind.request, 'Request #${r['no']} edited', 'تعديل الطلب رقم ${r['no']}', r);
+        } else if (r['status'] == 'done') {
+          add(ChangeKind.request, 'Request #${r['no']} issued (receipt #${r['receiptNo']})', 'صُرف الطلب رقم ${r['no']} (وصل ${r['receiptNo']})');
+        } else if (r['status'] == 'rejected') {
+          add(ChangeKind.request, 'Request #${r['no']} not issued', 'لم يُصرف الطلب رقم ${r['no']}');
+        }
+      },
+      removed: (r) => add(ChangeKind.request, 'Request #${r['no']} deleted', 'حذف الطلب رقم ${r['no']}'));
 
   // Purchases.
   _diff(before['purchases'], after['purchases'], (p) => '${p['no']}',
@@ -127,7 +146,7 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
     'customers': ('Staff names changed', 'تغيير في أسماء المستلمين'),
     'suppliers': ('Supplier list changed', 'تغيير في قائمة المجهزين'),
   };
-  const handled = {'items', 'receipts', 'purchases', 'transfers', 'monthCloses', 'departments', 'history', 'savedAt', 'source', 'format', 'version'};
+  const handled = {'items', 'requests', 'receipts', 'purchases', 'transfers', 'monthCloses', 'departments', 'history', 'savedAt', 'source', 'format', 'version'};
   var settings = false;
   for (final k in {...before.keys, ...after.keys}) {
     if (handled.contains(k) || _same(before[k], after[k])) continue;

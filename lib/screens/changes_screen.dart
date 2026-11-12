@@ -14,6 +14,7 @@ IconData changeIcon(ChangeKind k) => switch (k) {
       ChangeKind.item => Icons.inventory_2_outlined,
       ChangeKind.month => Icons.event_note_outlined,
       ChangeKind.department => Icons.apartment_outlined,
+      ChangeKind.request => Icons.assignment_outlined,
       ChangeKind.other => Icons.edit_note,
     };
 

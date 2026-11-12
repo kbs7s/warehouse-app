@@ -16,6 +16,7 @@ import 'expense_screens.dart' show ShareBar;
 import 'item_screens.dart';
 import 'purchase_screens.dart';
 import 'receipt_screens.dart';
+import 'request_screens.dart';
 import 'reports_screen.dart' show reorderList;
 import 'changes_screen.dart';
 import 'cloud_screens.dart';
@@ -123,6 +124,28 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 8),
           if (s.backupDue && !(s.cloud?.isStaff ?? false)) ...[
             BackupReminder(store: s),
+            const SizedBox(height: 12),
+          ],
+          if (s.openRequests.isNotEmpty) ...[
+            _Panel(
+              title: tx('Department requests waiting (${s.openRequests.length})', 'طلبات الأقسام بانتظارك (${s.openRequests.length})'),
+              action: (tx('See all', 'عرض الكل'), () => shell.go('Issue', 1)),
+              child: Column(children: [
+                for (final r in s.openRequests.take(5))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => openRequest(context, s, r),
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: t.colorScheme.primaryContainer,
+                      child: Icon(Icons.assignment_outlined, size: 18, color: t.colorScheme.onPrimaryContainer),
+                    ),
+                    title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}'),
+                    trailing: const Icon(Icons.chevron_right),
+                  ),
+              ]),
+            ),
             const SizedBox(height: 12),
           ],
           if (!(s.cloud?.isStaff ?? false) && s.toReview.isNotEmpty) ...[
