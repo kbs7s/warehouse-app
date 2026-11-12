@@ -422,8 +422,62 @@ class WarehouseStore extends ChangeNotifier {
     _changed();
   }
 
+  /// Issues written by team members that the owner has not checked yet, newest first.
+  List<Receipt> get toReview => [for (final r in receipts.reversed) if (r.review) r];
+
+  /// The owner has checked a team member's issue.
+  void approveReceipt(int no) {
+    for (final r in receipts.where((r) => r.no == no)) {
+      r.review = false;
+    }
+    _changed();
+  }
+
+  /// The batch an issue of this item is taken from first: the soonest expiry date with stock left.
+  ExpiryBatch? nextBatch(String itemId) =>
+      item(itemId)?.expiries.where((b) => b.qty != null && b.qty! > 0).firstOrNull;
+
+  /// Oldest expiry first: lowers the item's batches by what an issue takes (or gives it back),
+  /// and notes on each line which batches it came from.
+  void _issueExpiries(Receipt r, {required bool take}) {
+    for (final l in r.lines) {
+      final it = item(l.itemId);
+      if (it == null) continue;
+      if (take) {
+        var left = l.qty;
+        final taken = <ExpiryBatch>[];
+        for (final b in [...it.expiries]) {
+          if (left <= 0) break;
+          if (b.qty == null || b.qty! <= 0) continue;
+          final q = b.qty! < left ? b.qty! : left;
+          b.qty = b.qty! - q;
+          left -= q;
+          taken.add(ExpiryBatch(date: b.date, qty: q, lot: b.lot));
+          if (b.qty == 0) it.expiries.remove(b);
+        }
+        l.taken = taken.isEmpty ? null : taken;
+      } else {
+        for (final t in l.taken ?? const <ExpiryBatch>[]) {
+          final b = it.expiries.where((b) => b.date == t.date && b.lot == t.lot && b.qty != null).firstOrNull;
+          if (b != null) {
+            b.qty = b.qty! + (t.qty ?? 0);
+          } else {
+            it.expiries.add(ExpiryBatch(date: t.date, qty: t.qty, lot: t.lot));
+            it.expiries.sort((a, b) => a.date.compareTo(b.date));
+          }
+        }
+        l.taken = null;
+      }
+    }
+  }
+
   void saveReceipt(Receipt r, {int? replacingNo}) {
     r.by = cloud?.who ?? r.by;
+    final old = receipts.where((x) => x.no == (replacingNo ?? r.no)).firstOrNull;
+    r.at = old?.at ?? r.at ?? DateTime.now().toUtc().toIso8601String();
+    r.review = cloud?.isStaff ?? false; // the owner saving it is the check
+    if (old != null) _issueExpiries(old, take: false);
+    _issueExpiries(r, take: true);
     receipts.removeWhere((x) => x.no == (replacingNo ?? r.no));
     receipts.add(r);
     receipts.sort((a, b) => a.no.compareTo(b.no));
@@ -491,6 +545,9 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void deleteReceipt(int no) {
+    for (final r in receipts.where((r) => r.no == no)) {
+      _issueExpiries(r, take: false);
+    }
     receipts.removeWhere((r) => r.no == no);
     _changed();
   }

@@ -91,18 +91,26 @@ class Customer {
 }
 
 class ReceiptLine {
-  ReceiptLine({required this.itemId, required this.qty});
+  ReceiptLine({required this.itemId, required this.qty, this.taken});
   String itemId;
   num qty;
+  List<ExpiryBatch>? taken; // the expiry batches this line was taken from, soonest first
 
-  factory ReceiptLine.fromJson(Map<String, dynamic> j) =>
-      ReceiptLine(itemId: j['itemId'] as String, qty: _n(j['qty']));
-  Map<String, dynamic> toJson() => {'itemId': itemId, 'qty': qty};
+  factory ReceiptLine.fromJson(Map<String, dynamic> j) => ReceiptLine(
+        itemId: j['itemId'] as String,
+        qty: _n(j['qty']),
+        taken: j['taken'] == null ? null : [for (final b in j['taken'] as List) ExpiryBatch.fromJson(b as Map<String, dynamic>)],
+      );
+  Map<String, dynamic> toJson() => {
+        'itemId': itemId,
+        'qty': qty,
+        if (taken != null && taken!.isNotEmpty) 'taken': [for (final b in taken!) b.toJson()],
+      };
 }
 
 /// An issue of items from the store to a hospital department.
 class Receipt {
-  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false, this.by})
+  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false, this.by, this.at, this.review = false})
       : lines = lines ?? [];
   int no;
   String? date; // yyyy-MM-dd
@@ -112,6 +120,8 @@ class Receipt {
   List<ReceiptLine> lines;
   bool fromReserve; // an emergency issue taken from the reserve store
   String? by; // who saved it last, when signed in to the shared store
+  String? at; // when it was first written; decides who keeps a number two devices both used
+  bool review; // written by a team member and waiting for the owner to check it
 
   factory Receipt.fromJson(Map<String, dynamic> j) => Receipt(
         no: (j['no'] as num).toInt(),
@@ -122,6 +132,8 @@ class Receipt {
         lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
         fromReserve: j['fromReserve'] == true,
         by: j['by'] as String?,
+        at: j['at'] as String?,
+        review: j['review'] == true,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -132,6 +144,8 @@ class Receipt {
         'lines': [for (final l in lines) l.toJson()],
         if (fromReserve) 'fromReserve': true,
         if (by != null) 'by': by,
+        if (at != null) 'at': at,
+        if (review) 'review': true,
       };
 }
 

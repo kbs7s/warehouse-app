@@ -4,8 +4,9 @@ import 'dart:convert';
 ///
 /// Used when two devices saved changes at the same time, or one worked offline. Every record that
 /// only one side changed keeps that change. When both sides changed the same record, [local] wins.
-/// When both sides added a record with the same number (two new issues both numbered 20), the
-/// local one is given the next free number so neither is lost.
+/// When both sides added a record with the same number (two new issues both numbered 20, one of
+/// them written offline), the one written first keeps the number and the other is given the next
+/// free number, so neither is lost. Records without a time: the online one keeps the number.
 Map<String, dynamic> mergeData(Map<String, dynamic> base, Map<String, dynamic> local, Map<String, dynamic> remote) {
   final out = <String, dynamic>{...remote};
   for (final k in {...local.keys, ...remote.keys}) {
@@ -65,8 +66,11 @@ List<Map<String, dynamic>> _mergeRecords(List<Map<String, dynamic>> base, List<M
     } else if (lv == null || rv == null) {
       out[k] = (lv ?? rv)!; // deleted on one side, edited on the other: keep the edit
     } else if (numbered && bv == null && !_same(lv, rv)) {
-      out[k] = rv; // both added a record with this number
-      renumber.add(lv);
+      // Both added a record with this number: the one written first keeps it.
+      final la = lv['at'] as String?, ra = rv['at'] as String?;
+      final localFirst = la != null && ra != null && la.compareTo(ra) < 0;
+      out[k] = localFirst ? lv : rv;
+      renumber.add(localFirst ? rv : lv);
     } else {
       out[k] = lv;
     }

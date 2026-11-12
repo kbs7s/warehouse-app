@@ -228,6 +228,15 @@ class CloudSync extends ChangeNotifier {
             ...jsonDecode(_base!) as Map<String, dynamic>,
             for (final k in _staffKeys) k: local[k],
           };
+          // Issuing lowers the items' expiry batches (oldest first): that part of an item may change too.
+          final mine = {for (final i in (local['items'] as List? ?? const [])) '${(i as Map)['id']}': i};
+          allowed['items'] = [
+            for (final i in (allowed['items'] as List? ?? const []))
+              if (mine[(i as Map)['id']] == null)
+                i
+              else
+                {...i..remove('expiries'), if (mine[i['id']]!['expiries'] != null) 'expiries': mine[i['id']]!['expiries']},
+          ];
           if (_canon(allowed) != _canon(local)) {
             _apply(allowed);
             local = _snapshot();

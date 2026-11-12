@@ -28,6 +28,21 @@ void main() {
     expect(s.stock('P003').status, StockStatus.out);
   });
 
+  test('an issue is taken from the soonest expiry batch first and gives it back when deleted', () {
+    final s = seeded();
+    final it = s.item('P001')!;
+    it.expiries = [ExpiryBatch(date: '2027-01-01', qty: 5, lot: 'A'), ExpiryBatch(date: '2027-06-01', qty: 20, lot: 'B')];
+    expect(s.nextBatch('P001')!.lot, 'A');
+    s.saveReceipt(Receipt(no: 90, date: '2026-11-12', department: 'NICU', lines: [ReceiptLine(itemId: 'P001', qty: 8)]));
+    expect([for (final b in it.expiries) '${b.lot}:${b.qty}'], ['B:17']);
+    expect([for (final b in s.receipts.last.lines.single.taken!) '${b.lot}:${b.qty}'], ['A:5', 'B:3']);
+    expect(s.receipts.last.at, isNotNull);
+    s.saveReceipt(Receipt(no: 90, date: '2026-11-12', department: 'NICU', lines: [ReceiptLine(itemId: 'P001', qty: 2)]));
+    expect([for (final b in it.expiries) '${b.lot}:${b.qty}'], ['A:3', 'B:20']);
+    s.deleteReceipt(90);
+    expect([for (final b in it.expiries) '${b.lot}:${b.qty}'], ['A:5', 'B:20']);
+  });
+
   test('issuing and deleting a receipt moves stock', () {
     final s = seeded();
     final no = s.nextReceiptNo;

@@ -125,6 +125,27 @@ class HomeScreen extends StatelessWidget {
             BackupReminder(store: s),
             const SizedBox(height: 12),
           ],
+          if (!(s.cloud?.isStaff ?? false) && s.toReview.isNotEmpty) ...[
+            _Panel(
+              title: tx('Team issues waiting for your review (${s.toReview.length})', 'صرفيات الكادر بانتظار مراجعتك (${s.toReview.length})'),
+              child: Column(children: [
+                for (final r in s.toReview.take(5))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => openReceipt(context, s, r),
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: t.colorScheme.tertiaryContainer,
+                      child: Text('${r.no}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onTertiaryContainer)),
+                    ),
+                    title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}${r.by == null ? '' : ' · ${r.by}'}'),
+                    trailing: TextButton(onPressed: () => s.approveReceipt(r.no), child: Text(tx('Approve', 'اعتماد'))),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+          ],
           _Hero(
             greeting: _greeting,
             name: s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,

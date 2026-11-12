@@ -21,12 +21,17 @@ class ReceiptsScreen extends StatefulWidget {
 
 class _ReceiptsScreenState extends State<ReceiptsScreen> {
   String _q = '';
+  bool _reviewOnly = false;
 
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
     final q = _q.trim().toLowerCase();
+    final owner = !(store.cloud?.isStaff ?? false);
+    final waiting = store.toReview.length;
+    if (waiting == 0) _reviewOnly = false;
     final list = store.receipts.reversed.where((r) {
+      if (_reviewOnly && !r.review) return false;
       if (q.isEmpty) return true;
       return '${r.no}' == q ||
           (r.department ?? '').toLowerCase().contains(q) ||
@@ -43,12 +48,26 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
       ),
       body: CardList(
         empty: tx('No issue receipts found.', 'لا توجد وصولات صرف.'),
-        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Receipt number, department, person or item', 'رقم الوصل أو القسم أو المستلم أو المادة'))],
+        header: [SearchField(onChanged: (v) => setState(() => _q = v), hint: tx('Receipt number, department, person or item', 'رقم الوصل أو القسم أو المستلم أو المادة')),
+          if (owner && waiting > 0)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FilterChip(
+                  avatar: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: Text(tx('Waiting for your review ($waiting)', 'بانتظار مراجعتك ($waiting)')),
+                  selected: _reviewOnly,
+                  onSelected: (v) => setState(() => _reviewOnly = v),
+                ),
+              ),
+            ),
+        ],
         itemCount: list.length,
         itemBuilder: (_, i) {
           final r = list[i];
           return ListTile(
-            leading: CircleAvatar(child: Text('${r.no}')),
+            leading: Badge(isLabelVisible: r.review, child: CircleAvatar(child: Text('${r.no}'))),
             title: Row(
               children: [
                 Flexible(child: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontSize: 17))),
@@ -56,7 +75,8 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
               ],
             ),
             subtitle: Text(tx('${fmtDate(r.date)}  ·  ${r.lines.length} items', '${fmtDate(r.date)}  ·  ${r.lines.length} مادة') +
-                (r.fromReserve ? tx('  ·  from reserve', '  ·  من الاحتياط') : '')),
+                (r.fromReserve ? tx('  ·  from reserve', '  ·  من الاحتياط') : '') +
+                (r.review ? tx('  ·  waiting for review', '  ·  بانتظار المراجعة') + (r.by == null ? '' : ' (${r.by})') : '')),
             trailing: IconButton(
               tooltip: 'PDF',
               icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -229,6 +249,19 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if ((widget.existing?.review ?? false) && !(store.cloud?.isStaff ?? false))
+            Card(
+              color: Theme.of(context).colorScheme.tertiaryContainer,
+              margin: const EdgeInsets.only(bottom: 16),
+              child: ListTile(
+                leading: const Icon(Icons.fact_check_outlined),
+                title: Text(tx('Waiting for your review', 'بانتظار مراجعتك')),
+                subtitle: Text(tx(
+                    'Written by ${widget.existing!.by ?? 'a team member'}. Correct the quantities or items if needed, then approve.',
+                    'كتبه ${widget.existing!.by ?? 'أحد الكادر'}. صحّح الكميات أو المواد إن لزم ثم اعتمده.')),
+                trailing: FilledButton(onPressed: _save, child: Text(tx('Approve', 'اعتماد'))),
+              ),
+            ),
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -309,6 +342,15 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
     );
   }
 
+  /// Which expiry batch this line is taken from (oldest first), shown under the item.
+  String? _batchHint(String itemId) {
+    final saved = widget.existing?.lines.where((l) => l.itemId == itemId).firstOrNull?.taken;
+    final b = (saved != null && saved.isNotEmpty) ? saved.first : store.nextBatch(itemId);
+    if (b == null) return null;
+    final lot = (b.lot ?? '').isEmpty ? '' : tx(' · lot ${b.lot}', ' · تشغيلة ${b.lot}');
+    return tx('Taken from the batch expiring ${fmtDate(b.date)}$lot', 'يُصرف من الوجبة التي تنتهي ${fmtDate(b.date)}$lot');
+  }
+
   Widget _lineRow(int i, _Line l) {
     final item = store.item(l.itemId);
     final avail = _available(l.itemId);
@@ -332,6 +374,8 @@ class _ReceiptEditorState extends State<ReceiptEditor> {
                     tx('${l.itemId}  ·  in stock: ${fmtQty(avail)}', '${l.itemId}  ·  الموجود: ${fmtQty(avail)}'),
                     style: TextStyle(color: avail <= 0 ? Theme.of(context).colorScheme.bad : Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
+                  if (_batchHint(l.itemId) case final hint?)
+                    Text(hint, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                 ],
               ),
             ),

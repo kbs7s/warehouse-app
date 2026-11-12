@@ -53,8 +53,9 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
       added: unless(reopening, (r) {
         final lines = (r['lines'] as List? ?? const []).length;
         final dept = (r['department'] as String?) ?? '';
-        add(ChangeKind.issue, 'Issue #${r['no']}${dept.isEmpty ? '' : ' to $dept'} · $lines ${n(lines, 'item', 'items')}',
-            'وصل صرف رقم ${r['no']}${dept.isEmpty ? '' : ' إلى $dept'} · $lines ${n(lines, 'مادة', 'مواد')}', r);
+        final rev = r['review'] == true;
+        add(ChangeKind.issue, 'Issue #${r['no']}${dept.isEmpty ? '' : ' to $dept'} · $lines ${n(lines, 'item', 'items')}${rev ? ' · waiting for your review' : ''}',
+            'وصل صرف رقم ${r['no']}${dept.isEmpty ? '' : ' إلى $dept'} · $lines ${n(lines, 'مادة', 'مواد')}${rev ? ' · بانتظار مراجعتك' : ''}', r);
       }),
       edited: (r) => add(ChangeKind.issue, 'Issue #${r['no']} edited', 'تعديل وصل الصرف رقم ${r['no']}', r),
       removed: unless(closing, (r) => add(ChangeKind.issue, 'Issue #${r['no']} deleted', 'حذف وصل الصرف رقم ${r['no']}')));
@@ -82,7 +83,7 @@ List<StoreChange> findChanges(Map<String, dynamic> before, Map<String, dynamic> 
 
   // Items. A purchase with expiry dates also updates its items' dates: that is part of the
   // purchase line above, so only expiry dates changed by hand are listed.
-  final purchased = out.any((c) => c.kind == ChangeKind.purchase);
+  final purchased = out.any((c) => c.kind == ChangeKind.purchase || c.kind == ChangeKind.issue); // issues lower batches too
   final oldItems = {for (final i in _list(before['items'])) '${i['id']}': i};
   _diff(before['items'], after['items'], (i) => '${i['id']}',
       added: (i) => add(ChangeKind.item, 'New item: ${i['name']}', 'مادة جديدة: ${i['name']}'),
