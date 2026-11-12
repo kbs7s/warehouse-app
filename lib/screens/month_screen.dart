@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../export.dart';
 import '../l10n.dart';
+import 'send_file.dart';
+import '../pdf.dart';
 import '../month.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -64,6 +66,20 @@ class _MonthScreenState extends State<MonthScreen> {
         title: Text(tx('Month end', 'نهاية الشهر')),
         bottom: SubNav.bar(context),
         actions: [
+          IconButton(
+            tooltip: tx('Month report PDF', 'تقرير الشهر PDF'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => showPdfSheet(context,
+                name: 'Month-report-${from.substring(0, 7)}',
+                make: () => buildMonthReportPdf(s,
+                    title: monthName(from, to),
+                    from: from,
+                    to: to,
+                    rows: rows,
+                    stats: const {},
+                    issues: [for (final r in s.receipts) if ((r.date ?? '').compareTo(from) >= 0) r],
+                    purchases: [for (final p in s.purchases) if ((p.date ?? '').compareTo(from) >= 0) p])),
+          ),
           IconButton(
             tooltip: tx('Export to Excel', 'تصدير إلى إكسل'),
             icon: const Icon(Icons.table_view_outlined),

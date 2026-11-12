@@ -647,6 +647,23 @@ void main() {
       ..createSync(recursive: true)
       ..writeAsBytesSync(ar);
   });
+
+  test('month report PDF and barcode labels build in Arabic', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    isAr = true;
+    final rows = store.monthRows('0000-01-01', '9999-12-31');
+    final report = await buildMonthReportPdf(store,
+        title: '11/2026', from: '0000-01-01', to: '9999-12-31', rows: rows, stats: {'operations': 120},
+        issues: store.receipts, purchases: store.purchases);
+    final labels = await buildLabelsPdf(store, store.items.take(7).toList(), copies: 2);
+    final qr = await buildLabelsPdf(store, store.items.take(3).toList(), qr: true);
+    isAr = false;
+    expect(report.length, greaterThan(10000));
+    expect(labels.length, greaterThan(5000));
+    expect(qr.length, greaterThan(5000));
+    File('build/month-report.pdf').writeAsBytesSync(report);
+    File('build/labels.pdf').writeAsBytesSync(labels);
+  });
 }
 
 String todayIsoForTest() {
