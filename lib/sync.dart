@@ -274,6 +274,7 @@ class CloudSync extends ChangeNotifier {
             }
           }
           _done();
+          await _dailyCopy();
           return;
         } on CloudConflict {
           continue; // someone saved in between: read again and merge
@@ -284,6 +285,34 @@ class CloudSync extends ChangeNotifier {
       error = e.message;
       state = e.code == 'OFFLINE' ? SyncState.offline : SyncState.error;
       notifyListeners();
+    }
+  }
+
+  /// How many days of daily copies are kept online.
+  static const keepDays = 30;
+  DateTime? _copiedAt;
+  String? _prunedDay;
+
+  /// An owner's device keeps a copy of the shared data for each day online (refreshed at most
+  /// once an hour), and removes copies older than [keepDays]. A failure here never stops syncing.
+  Future<void> _dailyCopy() async {
+    final c = _client;
+    if (c == null || !isOwner || _base == null) return;
+    if (_copiedAt != null && DateTime.now().difference(_copiedAt!) < const Duration(hours: 1)) return;
+    final now = DateTime.now();
+    String day(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    try {
+      await c.saveBackup(day(now), jsonDecode(_base!) as Map<String, dynamic>);
+      _copiedAt = now;
+      if (_prunedDay != day(now)) {
+        final oldest = day(now.subtract(const Duration(days: keepDays)));
+        for (final b in await c.backups()) {
+          if (b.day.compareTo(oldest) < 0) await c.deleteBackup(b.day);
+        }
+        _prunedDay = day(now);
+      }
+    } catch (_) {
+      // Rules not updated yet, or offline: try again next time.
     }
   }
 

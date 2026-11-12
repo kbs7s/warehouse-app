@@ -273,6 +273,12 @@ class CloudCard extends StatelessWidget {
                     icon: const Icon(Icons.group_outlined),
                     label: Text(tx('Team', 'الفريق')),
                   ),
+                if (c.isOwner)
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DailyCopiesScreen(store: store))),
+                    icon: const Icon(Icons.history),
+                    label: Text(tx('Daily copies', 'النسخ اليومية')),
+                  ),
                 OutlinedButton.icon(
                   onPressed: () async {
                     if (await confirm(
@@ -538,4 +544,113 @@ class AccountScreen extends StatelessWidget {
                   'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
         ]),
       );
+}
+
+
+/// The online copies of the shared store, one per day for the last 30 days. Any day can be brought
+/// back, for example after a wrong delete; that day's data then replaces the shared store for everyone.
+class DailyCopiesScreen extends StatefulWidget {
+  const DailyCopiesScreen({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  State<DailyCopiesScreen> createState() => _DailyCopiesScreenState();
+}
+
+class _DailyCopiesScreenState extends State<DailyCopiesScreen> {
+  List<({String day, String savedAt, String savedBy})>? _list;
+  String? _error;
+  bool _busy = false;
+
+  CloudClient get _client => widget.store.cloud!.client!;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final l = await _client.backups();
+      if (mounted) setState(() => _list = l);
+    } catch (e) {
+      if (mounted) setState(() => _error = e is CloudError && e.code == 'PERMISSION_DENIED' ? 'PERMISSION' : _err(e));
+    }
+  }
+
+  Future<void> _restore(String day) async {
+    if (!await confirm(
+        context,
+        tx('Bring back ${fmtDate(day)}?', 'استرجاع نسخة ${fmtDate(day)}؟'),
+        tx('The shared store goes back to how it was at the end of that day, for everyone. Everything entered after it is removed. '
+                'Today\'s copy is kept, so you can come back to it.',
+            'يعود المخزن المشترك كما كان في نهاية ذلك اليوم، لكل الفريق. كل ما أُدخل بعده سيُحذف. '
+                'نسخة اليوم تبقى محفوظة، فيمكنك الرجوع إليها.'),
+        action: tx('Bring it back', 'استرجاع'))) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final data = await _client.backup(day);
+      widget.store.applyJson(data);
+      await widget.store.cloud!.syncNow();
+      if (mounted) {
+        toast(context, tx('The store is back to ${fmtDate(day)}.', 'عاد المخزن إلى ${fmtDate(day)}.'));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) toast(context, _err(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final l = _list;
+    return Scaffold(
+      appBar: HeaderBar(title: Text(tx('Daily copies', 'النسخ اليومية'))),
+      body: PageBody(maxWidth: 720, children: [
+        Text(
+          tx('The app keeps a copy of the shared store online for each of the last 30 days. Bring one back after a mistake, such as a wrong delete.',
+              'يحفظ التطبيق نسخة من المخزن المشترك أونلاين لكل يوم من آخر 30 يوماً. استرجع إحداها بعد خطأ، مثل حذف بالخطأ.'),
+          style: TextStyle(color: t.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        if (_busy) const LinearProgressIndicator(),
+        if (_error != null)
+          Text(
+            _error == 'PERMISSION'
+                ? tx('The online rules need one update before daily copies can be saved. Paste the new rules in the Firebase console.',
+                    'تحتاج قواعد الخادم تحديثاً واحداً قبل حفظ النسخ اليومية. الصق القواعد الجديدة في لوحة Firebase.')
+                : _error!,
+            style: TextStyle(color: t.colorScheme.bad, fontWeight: FontWeight.w600),
+          )
+        else if (l == null)
+          const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+        else if (l.isEmpty)
+          Text(tx('No copies yet. The first one is saved at the next sync.', 'لا توجد نسخ بعد. تُحفظ الأولى عند المزامنة القادمة.'))
+        else
+          Card(
+            child: Column(children: [
+              for (final b in l)
+                ListTile(
+                  leading: const Icon(Icons.inventory_outlined),
+                  title: Text(fmtDate(b.day), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(tx('Saved ${_time(b.savedAt)}${b.savedBy.isEmpty ? '' : ' · ${b.savedBy}'}',
+                      'حُفظت ${_time(b.savedAt)}${b.savedBy.isEmpty ? '' : ' · ${b.savedBy}'}')),
+                  trailing: OutlinedButton(onPressed: _busy ? null : () => _restore(b.day), child: Text(tx('Bring back', 'استرجاع'))),
+                ),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  static String _time(String iso) {
+    final d = DateTime.tryParse(iso)?.toLocal();
+    return d == null ? '' : '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
 }

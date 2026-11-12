@@ -211,6 +211,55 @@ class CloudClient {
     return ((j['writeResults'] as List).first as Map)['updateTime'] as String;
   }
 
+  // ---- Daily copies ----
+
+  /// Saves today's copy of the shared data as backups/[day] (yyyy-MM-dd), replacing an earlier copy of the same day.
+  Future<void> saveBackup(String day, Map<String, dynamic> data) async {
+    final packed = base64Encode(const GZipEncoder().encodeBytes(utf8.encode(jsonEncode(data))));
+    final res = await _send(() async => _http.patch(Uri.parse('${config._docsBase}/backups/$day'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'fields': {
+            'data': {'bytesValue': packed},
+            'savedBy': {'stringValue': user?.email ?? ''},
+            'savedAt': {'timestampValue': DateTime.now().toUtc().toIso8601String()},
+          }
+        })));
+    if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);
+  }
+
+  /// The daily copies kept online, newest first: (day, when saved, by whom). The data itself is not downloaded.
+  Future<List<({String day, String savedAt, String savedBy})>> backups() async {
+    final res = await _send(() async => _http.get(
+        Uri.parse('${config._docsBase}/backups?pageSize=100&mask.fieldPaths=savedAt&mask.fieldPaths=savedBy'),
+        headers: await _headers()));
+    final j = _decode(res);
+    if (res.statusCode != 200) throw _error(j, res.statusCode);
+    final out = [
+      for (final d in (j['documents'] as List? ?? []))
+        (
+          day: ((d as Map)['name'] as String).split('/').last,
+          savedAt: ((d['fields'] as Map?)?['savedAt'] as Map?)?['timestampValue'] as String? ?? '',
+          savedBy: ((d['fields'] as Map?)?['savedBy'] as Map?)?['stringValue'] as String? ?? '',
+        ),
+    ];
+    return out..sort((a, b) => b.day.compareTo(a.day));
+  }
+
+  /// The shared data as it was saved on [day].
+  Future<Map<String, dynamic>> backup(String day) async {
+    final res = await _send(() async => _http.get(Uri.parse('${config._docsBase}/backups/$day'), headers: await _headers()));
+    final j = _decode(res);
+    if (res.statusCode != 200) throw _error(j, res.statusCode);
+    final bytes = base64Decode((((j['fields'] as Map?)?['data'] as Map?)?['bytesValue'] as String?) ?? '');
+    return jsonDecode(utf8.decode(const GZipDecoder().decodeBytes(bytes))) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteBackup(String day) async {
+    final res = await _send(() async => _http.delete(Uri.parse('${config._docsBase}/backups/$day'), headers: await _headers()));
+    if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);
+  }
+
   Future<List<Member>> members() async {
     final res = await _send(() async => _http.get(Uri.parse('${config._docsBase}/members?pageSize=300'), headers: await _headers()));
     final j = _decode(res);
