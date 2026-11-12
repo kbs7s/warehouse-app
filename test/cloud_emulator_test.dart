@@ -89,11 +89,49 @@ void main() {
 
     // The owner was told about what the staff member did, credited to them by name.
     final told = [for (final c in owner.changes) '${c.by}: ${c.en}'];
-    expect(told, contains('Ali: Issue #3 to ER · 1 item'));
+    expect(told, contains('Ali: Issue #3 to ER · 1 item · waiting for your review'));
+    expect(ownerStore.toReview.map((r) => r.no), [3, 2]); // both of Ali's issues
     expect(told.where((t) => t.contains('Gloves')), isEmpty); // the undone item edit never arrived
     expect(owner.unread, greaterThan(0));
     await owner.markRead();
     expect(owner.unread, 0);
+
+    // A department login only sends requests; the owner sees them and issues one.
+    await owner.client!.signUp('icu@example.com', 'secret3', keepCurrent: true);
+    await owner.client!.setMember(Member(email: 'icu@example.com', name: 'ICU', role: 'dept', department: 'ICU'));
+    final deptStore = WarehouseStore(null);
+    final dept = CloudSync(deptStore, null, pollEvery: hour);
+    await dept.signIn(cfg, 'icu@example.com', 'secret3');
+    expect(dept.isDept, isTrue);
+    expect(dept.department, 'ICU');
+    deptStore.saveRequest(StoreRequest(no: deptStore.nextRequestNo, date: '2026-11-12', department: 'ICU', lines: [ReceiptLine(itemId: 'P001', qty: 3)]));
+    deptStore.saveReceipt(Receipt(no: 50, date: '2026-11-12', department: 'ICU', lines: [ReceiptLine(itemId: 'P001', qty: 1)])); // not allowed: undone
+    await dept.syncNow();
+    await owner.syncNow();
+    expect(ownerStore.openRequests.map((r) => '${r.department}:${r.lines.single.qty}'), ['ICU:3']);
+    expect(ownerStore.receipts.where((r) => r.no == 50), isEmpty);
+    final req = ownerStore.openRequests.single;
+    final issue = Receipt(no: ownerStore.nextReceiptNo, date: '2026-11-12', department: 'ICU', lines: [ReceiptLine(itemId: 'P001', qty: 2)]);
+    ownerStore.saveReceipt(issue);
+    ownerStore.closeRequest(req.no, receipt: issue);
+    await owner.syncNow();
+    await dept.syncNow();
+    expect(deptStore.requests.single.status, 'done');
+    expect(deptStore.requests.single.given!.single.qty, 2);
+
+    // The owner's device keeps a daily copy online; team members cannot read the copies.
+    final copies = await owner.client!.backups();
+    expect(copies, hasLength(1));
+    expect((await owner.client!.backup(copies.single.day))['items'], isNotEmpty);
+    await expectLater(staff.client!.backups(), throwsA(isA<CloudError>()));
+
+    // The rules refuse a save that claims to be from someone else, or an unknown role.
+    final forged = await http.patch(
+        Uri.parse('http://$host:8080/v1/projects/demo-store/databases/(default)/documents/stores/main'),
+        headers: {'Authorization': 'Bearer ${await staff.client!.idToken()}', 'Content-Type': 'application/json'},
+        body: '{"fields":{"data":{"bytesValue":"${'A' * 200}"},"updatedBy":{"stringValue":"owner@example.com"}}}');
+    expect(forged.statusCode, 403);
+    await expectLater(owner.client!.setMember(Member(email: 'x@example.com', role: 'boss')), throwsA(isA<CloudError>()));
 
     // Removing a member locks them out.
     await owner.client!.removeMember('staff@example.com');

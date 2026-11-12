@@ -239,7 +239,10 @@ class CloudSync extends ChangeNotifier {
               if (mine[(i as Map)['id']] == null)
                 i
               else
-                {...i..remove('expiries'), if (mine[i['id']]!['expiries'] != null) 'expiries': mine[i['id']]!['expiries']},
+                <String, dynamic>{
+                  for (final e in i.entries) if (e.key != 'expiries') '${e.key}': e.value,
+                  if (mine[i['id']]!['expiries'] != null) 'expiries': mine[i['id']]!['expiries'],
+                },
           ];
           if (_canon(allowed) != _canon(local)) {
             _apply(allowed);

@@ -160,6 +160,9 @@ class CloudClient {
     return j;
   }
 
+  /// A fresh sign-in token (tests use it to call the database directly).
+  Future<String> idToken() => _token();
+
   // ---- Documents ----
 
   Future<Map<String, String>> _headers() async =>
