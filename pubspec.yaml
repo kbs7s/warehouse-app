@@ -39,6 +39,7 @@ dependencies:
   sembast: ^3.8.11
   sembast_web: ^2.4.6
   pdf: ^3.13.1
+  barcode: ^2.2.9
   printing: ^5.15.1
   intl: ^0.20.3
   collection: ^1.19.1

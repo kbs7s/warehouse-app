@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:barcode/barcode.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -327,4 +328,45 @@ Future<Uint8List> buildDepartmentsPdf(WarehouseStore store, String from, String 
 Future<void> shareDepartmentsPdf(WarehouseStore store, String from, String to, String title) => Printing.layoutPdf(
       name: '${title.replaceAll('/', '-')}.pdf',
       onLayout: (_) => buildDepartmentsPdf(store, from, to, title),
+    );
+
+
+/// Sticker sheet: one label per item with its name, unit and a barcode (or QR code) of its code,
+/// [copies] of each, on A4 in a grid of 3 across.
+Future<Uint8List> buildLabelsPdf(WarehouseStore store, List<Item> items, {bool qr = false, int copies = 1}) async {
+  final doc = pw.Document(theme: await _pdfTheme(), title: tx('Item labels', 'ملصقات المواد'));
+  final labels = [for (final i in items) for (var k = 0; k < copies; k++) i];
+  pw.Widget label(Item i) => pw.Container(
+        height: 120,
+        padding: const pw.EdgeInsets.all(6),
+        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey500, width: .5), borderRadius: pw.BorderRadius.circular(4)),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+          _name(i.name, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold), align: pw.TextAlign.center),
+          pw.SizedBox(height: 4),
+          pw.Expanded(
+            child: pw.BarcodeWidget(
+              barcode: qr ? Barcode.qrCode() : Barcode.code128(),
+              data: (i.barcode ?? '').isNotEmpty ? i.barcode! : i.id,
+              drawText: !qr,
+              textStyle: const pw.TextStyle(fontSize: 8),
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          _name('${i.id} · ${i.unit}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700), align: pw.TextAlign.center),
+        ]),
+      );
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    textDirection: _dir,
+    margin: const pw.EdgeInsets.all(24),
+    build: (_) => [
+      pw.GridView(crossAxisCount: 3, childAspectRatio: 120 / 172, crossAxisSpacing: 8, mainAxisSpacing: 8, children: [for (final i in labels) label(i)]),
+    ],
+  ));
+  return doc.save();
+}
+
+Future<void> shareLabelsPdf(WarehouseStore store, List<Item> items, {bool qr = false, int copies = 1}) => Printing.layoutPdf(
+      name: 'Labels.pdf',
+      onLayout: (_) => buildLabelsPdf(store, items, qr: qr, copies: copies),
     );

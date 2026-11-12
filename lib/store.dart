@@ -410,6 +410,14 @@ class WarehouseStore extends ChangeNotifier {
     return 'P${(max + 2).toString().padLeft(3, '0')}';
   }
 
+  /// The item a scanned code belongs to: its maker's barcode, or its own code (printed on our labels).
+  Item? itemByCode(String code) {
+    final c = code.trim().toLowerCase();
+    if (c.isEmpty) return null;
+    return items.where((i) => (i.barcode ?? '').trim().toLowerCase() == c).firstOrNull ??
+        items.where((i) => i.id.toLowerCase() == c).firstOrNull;
+  }
+
   bool nameTaken(String name, {String? exceptId}) =>
       items.any((i) => i.id != exceptId && i.name.trim() == name.trim());
 

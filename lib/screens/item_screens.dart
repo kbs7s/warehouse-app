@@ -8,6 +8,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
 import 'expiry_screens.dart';
+import 'scan.dart';
 
 class ItemDetailScreen extends StatelessWidget {
   const ItemDetailScreen({super.key, required this.store, required this.itemId});
@@ -179,6 +180,7 @@ class _ItemFormState extends State<_ItemForm> {
   late final _opening = TextEditingController(text: fmtQty(widget.item?.openingQty ?? 0).replaceAll(',', ''));
   late final _min = TextEditingController(text: fmtQty(widget.item?.minLevel ?? 0).replaceAll(',', ''));
   late final _note = TextEditingController(text: widget.item?.note);
+  late final _barcode = TextEditingController(text: widget.item?.barcode);
   late final _sale = TextEditingController(text: widget.item?.salePrice?.round().toString());
   late final _openCost = TextEditingController(text: widget.item?.openingUnitCost?.toString());
   late bool _active = widget.item?.active ?? true;
@@ -216,6 +218,7 @@ class _ItemFormState extends State<_ItemForm> {
       salePrice: parseNum(_sale.text),
       openingUnitCost: parseNum(_openCost.text),
       expiries: widget.item?.expiries,
+      barcode: _barcode.text.trim().isEmpty ? null : _barcode.text.trim(),
     ));
     Navigator.pop(context);
   }
@@ -317,6 +320,32 @@ class _ItemFormState extends State<_ItemForm> {
                   ),
               ]),
             ],
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _barcode,
+              decoration: InputDecoration(
+                labelText: tx('Barcode on the box (optional)', 'الباركود على العلبة (اختياري)'),
+                helperText: tx('Without one, print a label from Stock > Barcodes.', 'إن لم يوجد، اطبع ملصقاً من المخزون > الباركود.'),
+                prefixIcon: const Icon(Icons.qr_code_2, size: 20),
+                suffixIcon: IconButton(
+                  tooltip: tx('Scan it', 'قراءته بالكاميرا'),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  onPressed: () async {
+                    final code = await scanCode(context);
+                    if (code != null) setState(() => _barcode.text = code);
+                  },
+                ),
+              ),
+              validator: (v) {
+                final c = (v ?? '').trim();
+                if (c.isEmpty) return null;
+                final other = widget.store.itemByCode(c);
+                if (other != null && other.id != (widget.item?.id ?? _id.text.trim())) {
+                  return tx('Already used by ${other.name}', 'مستخدم للمادة ${other.name}');
+                }
+                return null;
+              },
+            ),
           ]),
           section(tx('Stock', 'المخزون'), Icons.warehouse_outlined, hint: tx('The app adds purchases and takes away issues by itself.', 'التطبيق يضيف المشتريات ويطرح الصرف تلقائياً.'), [
             Text(tx('Kept in', 'مكان الخزن'), style: t.textTheme.labelLarge),

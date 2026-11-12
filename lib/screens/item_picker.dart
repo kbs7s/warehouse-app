@@ -4,6 +4,7 @@ import '../l10n.dart';
 import '../models.dart';
 import '../store.dart';
 import '../ui.dart';
+import 'scan.dart';
 
 /// Searchable list of items; returns the chosen item id, or null. With [reserve] it lists the
 /// reserve store's items (including those kept only there) and their reserve quantity; with [all]
@@ -43,6 +44,16 @@ class _ItemPickerState extends State<_ItemPicker> {
               decoration: InputDecoration(
                   hintText: tx('Type part of the item name', 'اكتب جزءاً من اسم المادة'),
                   prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    tooltip: tx('Scan a barcode', 'قراءة الباركود'),
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      final id = await scanItem(context, widget.store);
+                      if (id == null || !context.mounted) return;
+                      if (widget.already.contains(id)) return toast(context, tx('Already on this list.', 'موجودة في القائمة.'));
+                      Navigator.pop(context, id);
+                    },
+                  ),
                   border: const OutlineInputBorder()),
             ),
           ),

@@ -19,6 +19,7 @@ import 'screens/payments_screen.dart';
 import 'screens/profit_screen.dart';
 import 'screens/purchase_screens.dart';
 import 'screens/receipt_screens.dart';
+import 'screens/labels_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/request_screens.dart';
 import 'screens/reserve_screens.dart';
@@ -141,6 +142,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
       ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
+      ('Barcodes', 'الباركود', (s, _) => LabelsScreen(store: s)),
     ]),
     // Stock counts of both stores, each on its own page.
     _Section('Count', 'الجرد', Icons.fact_check_outlined, Icons.fact_check, [

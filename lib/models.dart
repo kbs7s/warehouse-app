@@ -17,6 +17,7 @@ class Item {
     this.openingUnitCost,
     this.openingReserve = 0,
     this.reserveOnly = false,
+    this.barcode,
     List<ExpiryBatch>? expiries,
   }) : expiries = expiries ?? [];
 
@@ -33,6 +34,7 @@ class Item {
   List<ExpiryBatch> expiries; // expiry dates of the stock on hand, entered by hand
   num openingReserve; // part of openingQty that starts in the reserve (emergency) store
   bool reserveOnly; // kept only in the reserve store: hidden from the main store's lists and count
+  String? barcode; // the maker's barcode on the box, when it has one (the item code always works too)
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         id: j['id'] as String,
@@ -47,6 +49,7 @@ class Item {
         openingUnitCost: j['openingUnitCost'] as num?,
         openingReserve: _n(j['openingReserve']),
         reserveOnly: j['reserveOnly'] == true,
+        barcode: j['barcode'] as String?,
         expiries: [for (final e in (j['expiries'] as List? ?? [])) ExpiryBatch.fromJson(e as Map<String, dynamic>)],
       );
 
@@ -63,6 +66,7 @@ class Item {
         'openingUnitCost': openingUnitCost,
         if (openingReserve != 0) 'openingReserve': openingReserve,
         if (reserveOnly) 'reserveOnly': true,
+        if (barcode != null) 'barcode': barcode,
         if (expiries.isNotEmpty) 'expiries': [for (final e in expiries) e.toJson()],
       };
 }

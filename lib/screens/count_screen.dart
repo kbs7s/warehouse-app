@@ -6,6 +6,7 @@ import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
+import 'scan.dart';
 
 /// Stock count of the main store (or the reserve store): one item at a time, then the shortfall is issued to departments.
 class StockCountScreen extends StatefulWidget {
@@ -122,6 +123,17 @@ class _StockCountScreenState extends State<StockCountScreen> {
               }
             },
             child: Text(tx('Cancel count', 'إلغاء الجرد')),
+          ),
+          IconButton.filledTonal(
+            tooltip: tx('Scan an item to count it', 'اقرأ باركود مادة لجردها'),
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              final id = await scanItem(context, s);
+              if (id == null || !context.mounted) return;
+              final k = items.indexWhere((i) => i.id == id);
+              if (k < 0) return toast(context, tx('That item is not in this count.', 'هذه المادة ليست ضمن هذا الجرد.'));
+              setState(() => _show(k));
+            },
           ),
         ]),
         const SizedBox(height: 6),
