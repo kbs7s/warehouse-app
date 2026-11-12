@@ -67,7 +67,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         itemBuilder: (_, i) {
           final r = list[i];
           return ListTile(
-            leading: Badge(isLabelVisible: r.review, child: CircleAvatar(child: Text('${r.no}'))),
+            leading: NumberMark(r.no, color: r.review ? Theme.of(context).colorScheme.warning : null),
             title: Row(
               children: [
                 Flexible(child: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontSize: 17))),

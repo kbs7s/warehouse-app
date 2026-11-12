@@ -58,7 +58,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
         itemBuilder: (_, i) {
           final r = list[i];
           return ListTile(
-            leading: CircleAvatar(child: Text('${r.no}')),
+            leading: NumberMark(r.no),
             title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontSize: 17)),
             subtitle: Text('${fmtDate(r.date)}  ·  ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}'
                 '${r.by == null ? '' : '  ·  ${r.by}'}'),

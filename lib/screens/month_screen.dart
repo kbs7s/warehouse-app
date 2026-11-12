@@ -127,7 +127,9 @@ class _MonthScreenState extends State<MonthScreen> {
               icon: Icons.swap_vert,
               hint: tx('of ${rows.length} items', 'من ${rows.length} مادة')),
         ]),
-        SectionTitle(tx('Items this month', 'المواد هذا الشهر'), trailing: Text('${shown.length}')),
+        SectionTitle(tx('Items this month', 'المواد هذا الشهر'), trailing: shown.isEmpty
+                ? null
+                : Text(tx('${shown.length} items', '${shown.length} مادة'), style: TextStyle(color: t.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600))),
         Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           ChoiceChip(
               label: Text(tx('Moved this month', 'تحركت هذا الشهر')),
@@ -189,12 +191,8 @@ class _OpenMonthCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(phone ? 20 : 26),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: heroGradient(),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        color: heroColor(),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(tx('Open month', 'الشهر المفتوح'), style: t.textTheme.labelLarge!.copyWith(color: Colors.white70)),

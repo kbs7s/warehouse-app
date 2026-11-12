@@ -44,11 +44,9 @@ const accentChoices = <(String, String, Color)>[
 /// The colour chosen on this device; set by the app before each build.
 Color appAccent = AppColors.brand;
 
-/// Background of the big coloured cards (home and month): the header gradient, or the chosen
-/// colour when it is not the standard teal.
-List<Color> heroGradient() => appAccent == accentChoices.first.$3
-    ? AppColors.header.reversed.toList()
-    : [Color.lerp(appAccent, Colors.black, .32)!, Color.lerp(appAccent, Colors.black, .18)!, appAccent];
+/// Background of the big coloured card on the Month page: one flat dark colour (no gradient),
+/// the header's teal, or a darker shade of the chosen colour.
+Color heroColor() => appAccent == accentChoices.first.$3 ? AppColors.header[1] : Color.lerp(appAccent, Colors.black, .25)!;
 
 /// The dark gradient header of every page, with white title and icons.
 class HeaderBar extends AppBar {

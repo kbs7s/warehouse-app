@@ -318,8 +318,7 @@ class SyncBadge extends StatelessWidget {
       builder: (_, _) => IconButton(
         tooltip: syncLine(c),
         onPressed: onTap,
-        icon: Icon(syncIcon(c.state), color: Colors.white),
-        style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .14)),
+        icon: Icon(syncIcon(c.state), color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     );
   }
