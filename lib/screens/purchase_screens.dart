@@ -78,7 +78,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         itemBuilder: (_, i) {
           final p = list[i];
           return ListTile(
-            leading: CircleAvatar(child: Text('${p.no}')),
+            leading: NumberMark(p.no),
             title: NameText(p.supplier ?? tx('No supplier', 'بدون مجهز'), style: const TextStyle(fontSize: 17)),
             subtitle: Text([
               fmtDate(p.date),

@@ -107,10 +107,7 @@ class HomeScreen extends StatelessWidget {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   onTap: () => openReceipt(context, s, r),
-                  leading: CircleAvatar(
-                    backgroundColor: t.colorScheme.secondaryContainer,
-                    child: Text('${r.no}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onSecondaryContainer)),
-                  ),
+                  leading: NumberMark(r.no),
                   title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}'),
                   trailing: const Icon(Icons.chevron_right),
@@ -118,127 +115,144 @@ class HomeScreen extends StatelessWidget {
             ]),
     );
 
+    final staff = s.cloud?.isStaff ?? false;
+    final phone = isPhone(context);
+    String itemsWord(int n) => n == 1 ? tx('item', 'مادة') : tx('items', 'مواد');
+
+    // Everything waiting on the owner, in one card: department requests, team issues to check, the backup.
+    final waiting = <Widget>[
+      if (s.openRequests.isNotEmpty) ...[
+        _SubHead(tx('Department requests (${s.openRequests.length})', 'طلبات الأقسام (${s.openRequests.length})'),
+            action: (tx('See all', 'عرض الكل'), () => shell.go('Issue', 1))),
+        for (final r in s.openRequests.take(4))
+          _Row(
+            lead: NumberMark(r.no, color: t.colorScheme.primary),
+            title: r.department ?? tx('No department', 'بدون قسم'),
+            sub: '${fmtDate(r.date)} · ${r.lines.length} ${itemsWord(r.lines.length)}',
+            onTap: () => openRequest(context, s, r),
+            trailing: Text(tx('Issue', 'صرف'), style: TextStyle(color: t.colorScheme.primary, fontWeight: FontWeight.w700)),
+          ),
+      ],
+      if (!staff && s.toReview.isNotEmpty) ...[
+        _SubHead(tx('Team issues to review (${s.toReview.length})', 'صرفيات الكادر للمراجعة (${s.toReview.length})')),
+        for (final r in s.toReview.take(4))
+          _Row(
+            lead: NumberMark(r.no, color: t.colorScheme.warning),
+            title: r.department ?? tx('No department', 'بدون قسم'),
+            sub: '${fmtDate(r.date)} · ${r.lines.length} ${itemsWord(r.lines.length)}${r.by == null ? '' : ' · ${r.by}'}',
+            onTap: () => openReceipt(context, s, r),
+            trailing: TextButton(onPressed: () => s.approveReceipt(r.no), child: Text(tx('Approve', 'اعتماد'))),
+          ),
+      ],
+      if (s.backupDue && !staff) ...[
+        _SubHead(s.daysSinceBackup == null
+            ? tx('No backup yet', 'لا توجد نسخة احتياطية بعد')
+            : tx('Last backup ${s.daysSinceBackup} days ago', 'آخر نسخة احتياطية قبل ${s.daysSinceBackup} يوم')),
+        Text(tx('Save a copy to Files or iCloud Drive once a week.', 'احفظ نسخة في Files أو iCloud Drive مرة كل أسبوع.'),
+            style: TextStyle(color: t.colorScheme.onSurface)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          OutlinedButton.icon(onPressed: () => exportBackup(context, s), icon: const Icon(Icons.download), label: Text(tx('Back up now', 'نسخ احتياطي الآن'))),
+          TextButton(onPressed: s.snoozeBackup, child: Text(tx('Tomorrow', 'غداً'))),
+        ]),
+      ],
+    ];
+    final waitingCard = waiting.isEmpty
+        ? null
+        : Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(tx('Waiting for you', 'بانتظارك'), style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w800)),
+                ...waiting,
+              ]),
+            ),
+          );
+
+    final issueBtn = FilledButton.icon(
+      style: FilledButton.styleFrom(minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+      onPressed: () => openReceipt(context, s, null),
+      icon: const Icon(Icons.outbox_outlined),
+      label: Text(tx('Issue to department', 'صرف إلى قسم')),
+    );
+    final purchaseBtn = OutlinedButton.icon(
+      // On the page background the theme's grey fill disappears, so this one sits on the card colour with an edge.
+      style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          backgroundColor: t.cardTheme.color ?? t.colorScheme.surfaceContainerLowest,
+          side: BorderSide(color: t.colorScheme.outline),
+          textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+      onPressed: () => openPurchase(context, s, null),
+      icon: const Icon(Icons.add_shopping_cart),
+      label: Text(tx('Record purchase', 'تسجيل شراء')),
+    );
+    final icons = <Widget>[
+      if (!staff) IconButton(tooltip: tx('Export everything to Excel', 'تصدير كل البيانات إلى إكسل'), onPressed: () => exportExcel(s), icon: const Icon(Icons.table_view_outlined)),
+      ChangesBell(store: s),
+      SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
+      if (w < 700) ...[
+        IconButton(tooltip: tx('Reserve store', 'مخزن الاحتياط'), onPressed: () => shell.go('Reserve'), icon: const Icon(Icons.warehouse_outlined)),
+        IconButton(tooltip: tx('Equipment', 'المعدات'), onPressed: () => _push(context, EquipmentScreen(store: s)), icon: const Icon(Icons.medical_services_outlined)),
+        IconButton(tooltip: tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), onPressed: () => _push(context, SettingsScreen(store: s)), icon: const Icon(Icons.settings_outlined)),
+      ],
+    ];
+
+    // Cards after the figures, two to a row on wide screens; an odd one out takes the full width.
+    final cards = <Widget>[?waitingCard, reorderCard, recentCard, expiryCard, whereCard];
+    final grid = <Widget>[];
+    if (wide) {
+      for (var i = 0; i < cards.length; i += 2) {
+        grid.add(i + 1 < cards.length
+            ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: cards[i]),
+                const SizedBox(width: 16),
+                Expanded(child: cards[i + 1]),
+              ])
+            : cards[i]);
+        grid.add(const SizedBox(height: 16));
+      }
+    } else {
+      for (final c in cards) {
+        grid..add(c)..add(const SizedBox(height: 12));
+      }
+    }
+
     return Scaffold(
       body: SafeArea(
         child: PageBody(children: [
           const SizedBox(height: 8),
-          if (s.backupDue && !(s.cloud?.isStaff ?? false)) ...[
-            BackupReminder(store: s),
-            const SizedBox(height: 12),
-          ],
-          if (s.openRequests.isNotEmpty) ...[
-            _Panel(
-              title: tx('Department requests waiting (${s.openRequests.length})', 'طلبات الأقسام بانتظارك (${s.openRequests.length})'),
-              action: (tx('See all', 'عرض الكل'), () => shell.go('Issue', 1)),
-              child: Column(children: [
-                for (final r in s.openRequests.take(5))
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => openRequest(context, s, r),
-                    leading: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: t.colorScheme.primaryContainer,
-                      child: Icon(Icons.assignment_outlined, size: 18, color: t.colorScheme.onPrimaryContainer),
-                    ),
-                    title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}'),
-                    trailing: const Icon(Icons.chevron_right),
-                  ),
+          // The title row: the store's name and today's date, with the header icons.
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                NameText(s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,
+                    style: t.textTheme.headlineSmall!.copyWith(fontWeight: FontWeight.w800, fontSize: phone ? 22 : 26)),
+                Text('$_greeting · ${fmtDate(todayIso())}', style: TextStyle(color: t.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
               ]),
             ),
-            const SizedBox(height: 12),
-          ],
-          if (!(s.cloud?.isStaff ?? false) && s.toReview.isNotEmpty) ...[
-            _Panel(
-              title: tx('Team issues waiting for your review (${s.toReview.length})', 'صرفيات الكادر بانتظار مراجعتك (${s.toReview.length})'),
-              child: Column(children: [
-                for (final r in s.toReview.take(5))
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => openReceipt(context, s, r),
-                    leading: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: t.colorScheme.tertiaryContainer,
-                      child: Text('${r.no}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onTertiaryContainer)),
-                    ),
-                    title: NameText(r.department ?? tx('No department', 'بدون قسم'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${fmtDate(r.date)} · ${r.lines.length} ${r.lines.length == 1 ? tx('item', 'مادة') : tx('items', 'مواد')}${r.by == null ? '' : ' · ${r.by}'}'),
-                    trailing: TextButton(onPressed: () => s.approveReceipt(r.no), child: Text(tx('Approve', 'اعتماد'))),
-                  ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-          ],
-          _Hero(
-            greeting: _greeting,
-            name: s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,
-            onIssue: () => openReceipt(context, s, null),
-            onPurchase: () => openPurchase(context, s, null),
-            trailing: [
-              if (!(s.cloud?.isStaff ?? false))
-                _HeroIcon(Icons.table_view_outlined, tx('Export everything to Excel', 'تصدير كل البيانات إلى إكسل'), () => exportExcel(s)),
-              ChangesBell(store: s, color: Colors.white),
-              SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
-              if (w < 700) ...[
-                    _HeroIcon(Icons.warehouse_outlined, tx('Reserve store', 'مخزن الاحتياط'), () => shell.go('Reserve')),
-                    _HeroIcon(Icons.medical_services_outlined, tx('Equipment', 'المعدات'), () => _push(context, EquipmentScreen(store: s))),
-                    _HeroIcon(Icons.settings_outlined, tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), () => _push(context, SettingsScreen(store: s))),
-              ],
-            ],
-          ),
+            ...icons,
+          ]),
           const SizedBox(height: 16),
-          TileGrid(children: [
-            MetricTile(
-                label: tx('Items in stock', 'مواد متوفرة'),
-                value: '${all.length - low - out}',
-                icon: Icons.inventory_2_outlined,
-                hint: tx('of ${all.length} active items', 'من ${all.length} مادة فعالة'),
+          if (phone)
+            Row(children: [Expanded(child: issueBtn), const SizedBox(width: 10), Expanded(child: purchaseBtn)])
+          else
+            Row(children: [issueBtn, const SizedBox(width: 12), purchaseBtn]),
+          const SizedBox(height: 16),
+          _Figures(children: [
+            _Figure(tx('Items in stock', 'مواد متوفرة'), '${all.length - low - out}', tx('of ${all.length} active items', 'من ${all.length} مادة فعالة'),
                 onTap: () => shell.go('Stock')),
-            MetricTile(
-                label: tx('Running low', 'قاربت على النفاد'),
-                value: '$low',
-                icon: Icons.trending_down,
-                color: low > 0 ? AppColors.warn : null,
-                hint: tx('At or under minimum', 'عند الحد الأدنى أو أقل'),
-                onTap: () => shell.go('Stock', 1)),
-            MetricTile(
-                label: tx('Out of stock', 'نفدت'),
-                value: '$out',
-                icon: Icons.remove_shopping_cart_outlined,
-                color: out > 0 ? AppColors.bad : null,
-                hint: tx('Nothing left', 'لم يبقَ شيء'),
-                onTap: () => shell.go('Stock', 1)),
-            MetricTile(
-                label: tx('Issued', 'صُرف'),
-                value: '${monthReceipts.length}',
-                icon: Icons.outbox_outlined,
-                hint: spendTotal > 0 ? tx('This month · ${fmtMoneyShort(spendTotal)}', 'هذا الشهر · ${fmtMoneyShort(spendTotal)}') : tx('Receipts this month', 'وصولات هذا الشهر'),
+            _Figure(tx('Running low', 'قاربت على النفاد'), '$low', tx('At or under minimum', 'عند الحد الأدنى أو أقل'),
+                color: low > 0 ? t.colorScheme.warning : null, onTap: () => shell.go('Stock', 1)),
+            _Figure(tx('Out of stock', 'نفدت'), '$out', tx('Nothing left', 'لم يبقَ شيء'),
+                color: out > 0 ? t.colorScheme.bad : null, onTap: () => shell.go('Stock', 1)),
+            _Figure(
+                tx('Issued this month', 'صرف هذا الشهر'),
+                '${monthReceipts.length}',
+                spendTotal > 0 ? tx('Receipts · ${fmtMoneyShort(spendTotal)}', 'وصل · ${fmtMoneyShort(spendTotal)}') : tx('Receipts', 'وصل'),
                 onTap: () => shell.go('Issue')),
           ]),
           const SizedBox(height: 16),
-          if (wide)
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: reorderCard),
-              const SizedBox(width: 16),
-              Expanded(child: recentCard),
-            ])
-          else ...[
-            reorderCard,
-            const SizedBox(height: 16),
-            recentCard,
-          ],
-          const SizedBox(height: 16),
-          if (wide)
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: expiryCard),
-              const SizedBox(width: 16),
-              Expanded(child: whereCard),
-            ])
-          else ...[
-            expiryCard,
-            const SizedBox(height: 16),
-            whereCard,
-          ],
+          ...grid,
           if (insights.isNotEmpty) ...[
             SectionTitle(tx('Needs attention', 'يحتاج انتباهك'), trailing: Text('${insights.length}', style: t.textTheme.labelLarge)),
             Card(
@@ -264,16 +278,8 @@ class HomeScreen extends StatelessWidget {
           if (s.invoices.isNotEmpty) ...[
             SectionTitle(tx('Sales', 'المبيعات')),
             TileGrid(wideColumns: 2, children: [
-              MetricTile(
-                  label: tx('Clients owe you', 'ديون الزبائن لك'),
-                  value: fmtMoneyShort(s.owedToUs),
-                  icon: Icons.hourglass_bottom,
-                  onTap: () => shell.go('Money', 1)),
-              MetricTile(
-                  label: tx('Sold this month', 'مبيعات هذا الشهر'),
-                  value: fmtMoneyShort(s.profit(from, to).sales),
-                  icon: Icons.trending_up,
-                  onTap: () => shell.go('Money', 1)),
+              MetricTile(label: tx('Clients owe you', 'ديون الزبائن لك'), value: fmtMoneyShort(s.owedToUs), onTap: () => shell.go('Money', 1)),
+              MetricTile(label: tx('Sold this month', 'مبيعات هذا الشهر'), value: fmtMoneyShort(s.profit(from, to).sales), onTap: () => shell.go('Money', 1)),
             ]),
           ],
         ]),
@@ -303,91 +309,109 @@ Map<String, num> departmentSpend(WarehouseStore s, String from, String to) {
   return out;
 }
 
-class _Hero extends StatelessWidget {
-  const _Hero({required this.greeting, required this.name, required this.onIssue, required this.onPurchase, this.trailing = const []});
-  final String greeting, name;
-  final VoidCallback onIssue, onPurchase;
-  final List<Widget> trailing;
+/// The four stock figures in one divided card: a label, a number and a note each, no icons.
+class _Figures extends StatelessWidget {
+  const _Figures({required this.children});
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final phone = isPhone(context);
-    final issue = FilledButton.icon(
-      style: FilledButton.styleFrom(
-          backgroundColor: Colors.white, foregroundColor: appAccent, minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
-      onPressed: onIssue,
-      icon: const Icon(Icons.outbox_outlined),
-      label: Text(tx('Issue to department', 'صرف إلى قسم')),
-    );
-    final purchase = OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white, backgroundColor: Colors.white.withValues(alpha: .12), side: const BorderSide(color: Colors.white54), minimumSize: const Size(0, 52), textStyle: t.textTheme.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
-      onPressed: onPurchase,
-      icon: const Icon(Icons.add_shopping_cart),
-      label: Text(tx('Record purchase', 'تسجيل شراء')),
-    );
-    final date = Text(fmtDate(todayIso()), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600));
-    final greetingText =
-        Text(greeting, style: t.textTheme.headlineMedium!.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -.5));
-    final nameText = NameText(name, style: t.textTheme.titleMedium!.copyWith(color: Colors.white.withValues(alpha: .9)));
-    return Container(
-      padding: EdgeInsets.all(phone ? 20 : 28),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: heroGradient(),
-        ),
-        boxShadow: const [BoxShadow(color: Color(0x330F766E), blurRadius: 24, offset: Offset(0, 10))],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Phones put the date beside the round buttons, so the greeting keeps the full width.
-        if (phone) ...[
-          Row(children: [
-            Expanded(child: date),
-            ...trailing,
-          ]),
-          const SizedBox(height: 4),
-          greetingText,
-          const SizedBox(height: 2),
-          nameText,
-        ] else
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                date,
-                const SizedBox(height: 6),
-                greetingText,
-                const SizedBox(height: 2),
-                nameText,
+    final line = Theme.of(context).colorScheme.outlineVariant;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth >= 560) {
+          return IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final (i, f) in children.indexed) ...[
+                if (i > 0) VerticalDivider(width: 1, color: line),
+                Expanded(child: f),
+              ],
+            ]),
+          );
+        }
+        // Phones: two by two.
+        Widget pair(int i) => IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: children[i]),
+                VerticalDivider(width: 1, color: line),
+                Expanded(child: children[i + 1]),
               ]),
-            ),
-            ...trailing,
-          ]),
-        SizedBox(height: phone ? 20 : 26),
-        if (phone)
-          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [issue, const SizedBox(height: 10), purchase])
-        else
-          Wrap(spacing: 12, runSpacing: 12, children: [issue, purchase]),
-      ]),
+            );
+        return Column(children: [pair(0), Divider(height: 1, color: line), pair(2)]);
+      }),
     );
   }
 }
 
-class _HeroIcon extends StatelessWidget {
-  const _HeroIcon(this.icon, this.tooltip, this.onTap);
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
+class _Figure extends StatelessWidget {
+  const _Figure(this.label, this.value, this.note, {this.color, this.onTap});
+  final String label, value, note;
+  final Color? color;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-        tooltip: tooltip,
-        onPressed: onTap,
-        icon: Icon(icon, color: Colors.white),
-        style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .14)),
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 30, height: 1.25, fontWeight: FontWeight.w800, fontFeatures: const [FontFeature.tabularFigures()], color: color ?? t.colorScheme.onSurface)),
+          Text(note, style: t.textTheme.bodySmall!.copyWith(color: t.colorScheme.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A small heading inside the "Waiting for you" card.
+class _SubHead extends StatelessWidget {
+  const _SubHead(this.text, {this.action});
+  final String text;
+  final (String, VoidCallback)? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(children: [
+          Expanded(
+              child: Text(text, style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+          if (action != null) TextButton(onPressed: action!.$2, child: Text(action!.$1)) else const SizedBox(height: 40),
+        ]),
+      );
+}
+
+/// One line in the "Waiting for you" card.
+class _Row extends StatelessWidget {
+  const _Row({required this.lead, required this.title, required this.sub, required this.onTap, this.trailing});
+  final Widget lead;
+  final String title, sub;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            lead,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                NameText(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)),
+                Text(sub, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+              ]),
+            ),
+            ?trailing,
+          ]),
+        ),
       );
 }
 

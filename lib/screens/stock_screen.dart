@@ -32,7 +32,8 @@ class _StockScreenState extends State<StockScreen> {
         .toList();
     int count(StockStatus st) => all.where((s) => s.status == st).length;
     final month = store.spentThisMonth, bought = store.boughtThisMonth;
-    final spendCols = MediaQuery.sizeOf(context).width >= 900;
+    // The month columns only appear once something moved this month; empty columns are noise.
+    final spendCols = MediaQuery.sizeOf(context).width >= 900 && (month.values.any((v) => v != 0) || bought.values.any((v) => v != 0));
 
     return Scaffold(
       appBar: HeaderBar(title: Text(tx('Stock', 'المخزون')), bottom: SubNav.bar(context)),
@@ -177,10 +178,14 @@ class _StockRow extends StatelessWidget {
                   alignment: AlignmentDirectional.centerStart,
                   child: NameText(s.item.name, style: const TextStyle(fontSize: 16.5)),
                 ),
+                if (s.qty < 0 && !phone)
+                  Text(tx('Negative balance: check the issues', 'رصيد سالب: راجع الصرفيات'),
+                      style: TextStyle(color: Theme.of(context).colorScheme.bad, fontSize: 12.5, fontWeight: FontWeight.w600)),
                 if (!spend && (phone || month != 0 || bought != 0))
                   Text(
                       [
                         if (phone) '${s.item.id} · ${s.item.unit}',
+                        if (s.qty < 0) tx('negative: check the issues', 'رصيد سالب: راجع الصرفيات'),
                         if (month != 0) tx('spent ${fmtQty(month)} this month', 'صُرف ${fmtQty(month)} هذا الشهر'),
                         if (bought != 0) tx('bought ${fmtQty(bought)}', 'اشتُري ${fmtQty(bought)}'),
                       ].join(' · '),
@@ -194,18 +199,23 @@ class _StockRow extends StatelessWidget {
             child: Text(
               fmtQty(s.qty),
               textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              // A negative balance is a data mistake (issued more than was recorded), so it stands out.
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: s.qty < 0 ? FontWeight.w800 : FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: s.qty < 0 ? Theme.of(context).colorScheme.bad : null),
             ),
           ),
           if (spend)
             SizedBox(
               width: _cols[6],
-              child: Text(month == 0 ? '·' : fmtQty(month), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w600)),
+              child: Text(fmtQty(month), textAlign: TextAlign.end, style: TextStyle(fontWeight: FontWeight.w600, color: month == 0 ? Theme.of(context).colorScheme.outline : null)),
             ),
           if (spend)
             SizedBox(
               width: _cols[7],
-              child: Text(bought == 0 ? '·' : fmtQty(bought), textAlign: TextAlign.end, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              child: Text(fmtQty(bought), textAlign: TextAlign.end, style: TextStyle(color: bought == 0 ? Theme.of(context).colorScheme.outline : Theme.of(context).colorScheme.onSurfaceVariant)),
             ),
           SizedBox(
             width: _cols[5],

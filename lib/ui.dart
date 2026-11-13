@@ -61,6 +61,10 @@ class StatusChip extends StatelessWidget {
       StockStatus.low => (tx('Low', 'منخفض'), cs.warning),
       StockStatus.out => (tx('Out', 'نفد'), cs.bad),
     };
+    // What is fine stays quiet grey text; only low and out get a coloured pill.
+    if (status == StockStatus.inStock) {
+      return Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 12.5));
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
@@ -193,16 +197,10 @@ class MetricTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18, color: color ?? t.colorScheme.primary),
-                const SizedBox(width: 6),
-              ],
-              Expanded(
-                  child: Text(label,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis)),
-            ]),
+            // A label and a number: no icon on top (icons on every figure only add noise).
+            Text(label,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -222,6 +220,25 @@ class MetricTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A list number (receipt, request, purchase) as plain bold figures instead of a coloured circle.
+class NumberMark extends StatelessWidget {
+  const NumberMark(this.no, {super.key, this.color});
+  final Object no;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 40,
+        child: Text('$no',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: color ?? Theme.of(context).colorScheme.onSurfaceVariant)),
+      );
 }
 
 /// Lays tiles out 2 per row on phones, 4 on wider screens.
