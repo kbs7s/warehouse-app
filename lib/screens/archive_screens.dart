@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../export.dart';
 import '../l10n.dart';
+import 'send_file.dart';
+import '../pdf.dart';
 import '../models.dart';
 import '../month.dart';
 import '../shell.dart';
@@ -251,6 +253,14 @@ class _ClosedMonthScreenState extends State<ClosedMonthScreen> {
       appBar: HeaderBar(
         title: Text(title),
         actions: [
+          IconButton(
+            tooltip: tx('Month report PDF', 'تقرير الشهر PDF'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => showPdfSheet(context,
+                name: 'Month-report-${m.from.substring(0, 7)}',
+                make: () => buildMonthReportPdf(s,
+                    title: title, from: m.from, to: m.to, rows: m.rows, stats: m.stats, issues: r.issues, purchases: r.purchases)),
+          ),
           IconButton(tooltip: tx('Export month to Excel', 'تصدير الشهر إلى إكسل'), icon: const Icon(Icons.table_view_outlined), onPressed: _export),
           if (isLast)
             PopupMenuButton<String>(

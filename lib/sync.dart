@@ -70,6 +70,10 @@ class CloudSync extends ChangeNotifier {
 
   /// Signed in as a team member who is not an owner: may only issue supplies.
   bool get isStaff => signedIn && !isOwner;
+
+  /// A department login: it only sends requests to the store.
+  bool get isDept => signedIn && (member?.isDept ?? false);
+  String get department => member?.department ?? '';
   CloudClient? get client => _client;
 
   /// Picks up a saved sign-in on this device.
@@ -95,7 +99,7 @@ class CloudSync extends ChangeNotifier {
     if (mail == null || token == null) return;
     _client = CloudClient(config, client: _http)
       ..user = CloudUser(email: mail, uid: '', idToken: '', refreshToken: token, expires: DateTime(2000));
-    if (j['role'] != null) member = Member(email: mail, role: j['role'] as String, name: (j['name'] as String?) ?? '');
+    if (j['role'] != null) member = Member(email: mail, role: j['role'] as String, name: (j['name'] as String?) ?? '', department: (j['department'] as String?) ?? '');
     state = SyncState.working;
     _startPolling();
     unawaited(syncNow());
@@ -226,8 +230,20 @@ class CloudSync extends ChangeNotifier {
           // Team members only issue supplies: anything else changed on their device is undone.
           final allowed = {
             ...jsonDecode(_base!) as Map<String, dynamic>,
-            for (final k in _staffKeys) k: local[k],
+            for (final k in isDept ? _deptKeys : _staffKeys) k: local[k],
           };
+          // Issuing lowers the items' expiry batches (oldest first): that part of an item may change too.
+          final mine = isDept ? const <String, dynamic>{} : {for (final i in (local['items'] as List? ?? const [])) '${(i as Map)['id']}': i};
+          allowed['items'] = [
+            for (final i in (allowed['items'] as List? ?? const []))
+              if (mine[(i as Map)['id']] == null)
+                i
+              else
+                <String, dynamic>{
+                  for (final e in i.entries) if (e.key != 'expiries') '${e.key}': e.value,
+                  if (mine[i['id']]!['expiries'] != null) 'expiries': mine[i['id']]!['expiries'],
+                },
+          ];
           if (_canon(allowed) != _canon(local)) {
             _apply(allowed);
             local = _snapshot();
@@ -261,6 +277,7 @@ class CloudSync extends ChangeNotifier {
             }
           }
           _done();
+          await _dailyCopy();
           return;
         } on CloudConflict {
           continue; // someone saved in between: read again and merge
@@ -271,6 +288,34 @@ class CloudSync extends ChangeNotifier {
       error = e.message;
       state = e.code == 'OFFLINE' ? SyncState.offline : SyncState.error;
       notifyListeners();
+    }
+  }
+
+  /// How many days of daily copies are kept online.
+  static const keepDays = 30;
+  DateTime? _copiedAt;
+  String? _prunedDay;
+
+  /// An owner's device keeps a copy of the shared data for each day online (refreshed at most
+  /// once an hour), and removes copies older than [keepDays]. A failure here never stops syncing.
+  Future<void> _dailyCopy() async {
+    final c = _client;
+    if (c == null || !isOwner || _base == null) return;
+    if (_copiedAt != null && DateTime.now().difference(_copiedAt!) < const Duration(hours: 1)) return;
+    final now = DateTime.now();
+    String day(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    try {
+      await c.saveBackup(day(now), jsonDecode(_base!) as Map<String, dynamic>);
+      _copiedAt = now;
+      if (_prunedDay != day(now)) {
+        final oldest = day(now.subtract(const Duration(days: keepDays)));
+        for (final b in await c.backups()) {
+          if (b.day.compareTo(oldest) < 0) await c.deleteBackup(b.day);
+        }
+        _prunedDay = day(now);
+      }
+    } catch (_) {
+      // Rules not updated yet, or offline: try again next time.
     }
   }
 
@@ -341,7 +386,10 @@ class CloudSync extends ChangeNotifier {
   }
 
   /// What a team member's device may change: issues, and the departments and people named on them.
-  static const _staffKeys = ['receipts', 'departments', 'customers'];
+  static const _staffKeys = ['receipts', 'requests', 'departments', 'customers'];
+
+  /// A department login may only change the requests.
+  static const _deptKeys = ['requests'];
 
   static const _emptyData = {'format': 'warehouse-backup', 'version': 2, 'source': 'Shared online store'};
 
@@ -367,6 +415,7 @@ class CloudSync extends ChangeNotifier {
           'email': u.email,
           'refreshToken': u.refreshToken,
           if (member != null) 'role': member!.role,
+          if (member != null && member!.department.isNotEmpty) 'department': member!.department,
           if (member != null) 'name': member!.name,
         }));
   }

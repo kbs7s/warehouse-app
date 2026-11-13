@@ -26,6 +26,7 @@ class WarehouseStore extends ChangeNotifier {
   List<Customer> customers = [];
   List<String> suppliers = [];
   List<Receipt> receipts = [];
+  List<StoreRequest> requests = []; // what departments asked for
   List<Transfer> transfers = []; // between the main and reserve stores
   StockCount? stockCount; // a count in progress
   StockCount? reserveCount; // a count of the reserve store in progress
@@ -144,6 +145,7 @@ class WarehouseStore extends ChangeNotifier {
     customers = [];
     suppliers = [];
     receipts = [];
+    requests = [];
     transfers = [];
     stockCount = null;
     reserveCount = null;
@@ -175,6 +177,7 @@ class WarehouseStore extends ChangeNotifier {
     customers = list('customers').map(Customer.fromJson).toList();
     suppliers = [for (final s in (j['suppliers'] as List? ?? [])) s as String];
     receipts = list('receipts').map(Receipt.fromJson).toList();
+    requests = list('requests').map(StoreRequest.fromJson).toList();
     transfers = list('transfers').map(Transfer.fromJson).toList();
     stockCount = j['stockCount'] == null ? null : StockCount.fromJson((j['stockCount'] as Map).cast<String, dynamic>());
     reserveCount = j['reserveCount'] == null ? null : StockCount.fromJson((j['reserveCount'] as Map).cast<String, dynamic>());
@@ -207,6 +210,7 @@ class WarehouseStore extends ChangeNotifier {
         'customers': [for (final c in customers) c.toJson()],
         'suppliers': suppliers,
         'receipts': [for (final r in receipts) r.toJson()],
+        'requests': [for (final r in requests) r.toJson()],
         'transfers': [for (final t in transfers) t.toJson()],
         if (stockCount != null) 'stockCount': stockCount!.toJson(),
         if (reserveCount != null) 'reserveCount': reserveCount!.toJson(),
@@ -406,6 +410,14 @@ class WarehouseStore extends ChangeNotifier {
     return 'P${(max + 2).toString().padLeft(3, '0')}';
   }
 
+  /// The item a scanned code belongs to: its maker's barcode, or its own code (printed on our labels).
+  Item? itemByCode(String code) {
+    final c = code.trim().toLowerCase();
+    if (c.isEmpty) return null;
+    return items.where((i) => (i.barcode ?? '').trim().toLowerCase() == c).firstOrNull ??
+        items.where((i) => i.id.toLowerCase() == c).firstOrNull;
+  }
+
   bool nameTaken(String name, {String? exceptId}) =>
       items.any((i) => i.id != exceptId && i.name.trim() == name.trim());
 
@@ -422,8 +434,93 @@ class WarehouseStore extends ChangeNotifier {
     _changed();
   }
 
+  // ---------- Department requests ----------
+
+  int get nextRequestNo => requests.fold<int>(0, (m, r) => r.no > m ? r.no : m) + 1;
+
+  /// Requests the store has not answered yet, oldest first.
+  List<StoreRequest> get openRequests => [for (final r in requests) if (r.open) r];
+
+  void saveRequest(StoreRequest r) {
+    r.by = cloud?.who ?? r.by;
+    r.at ??= DateTime.now().toUtc().toIso8601String();
+    requests.removeWhere((x) => x.no == r.no);
+    requests.add(r);
+    requests.sort((a, b) => a.no.compareTo(b.no));
+    _changed();
+  }
+
+  void deleteRequest(int no) {
+    requests.removeWhere((r) => r.no == no);
+    _changed();
+  }
+
+  /// Marks a request answered: issued with [receipt], or turned down when there is none.
+  void closeRequest(int no, {Receipt? receipt}) {
+    for (final r in requests.where((r) => r.no == no)) {
+      r.status = receipt == null ? 'rejected' : 'done';
+      r.receiptNo = receipt?.no;
+      r.given = receipt == null ? null : [for (final l in receipt.lines) ReceiptLine(itemId: l.itemId, qty: l.qty)];
+    }
+    _changed();
+  }
+
+  /// Issues written by team members that the owner has not checked yet, newest first.
+  List<Receipt> get toReview => [for (final r in receipts.reversed) if (r.review) r];
+
+  /// The owner has checked a team member's issue.
+  void approveReceipt(int no) {
+    for (final r in receipts.where((r) => r.no == no)) {
+      r.review = false;
+    }
+    _changed();
+  }
+
+  /// The batch an issue of this item is taken from first: the soonest expiry date with stock left.
+  ExpiryBatch? nextBatch(String itemId) =>
+      item(itemId)?.expiries.where((b) => b.qty != null && b.qty! > 0).firstOrNull;
+
+  /// Oldest expiry first: lowers the item's batches by what an issue takes (or gives it back),
+  /// and notes on each line which batches it came from.
+  void _issueExpiries(Receipt r, {required bool take}) {
+    for (final l in r.lines) {
+      final it = item(l.itemId);
+      if (it == null) continue;
+      if (take) {
+        var left = l.qty;
+        final taken = <ExpiryBatch>[];
+        for (final b in [...it.expiries]) {
+          if (left <= 0) break;
+          if (b.qty == null || b.qty! <= 0) continue;
+          final q = b.qty! < left ? b.qty! : left;
+          b.qty = b.qty! - q;
+          left -= q;
+          taken.add(ExpiryBatch(date: b.date, qty: q, lot: b.lot));
+          if (b.qty == 0) it.expiries.remove(b);
+        }
+        l.taken = taken.isEmpty ? null : taken;
+      } else {
+        for (final t in l.taken ?? const <ExpiryBatch>[]) {
+          final b = it.expiries.where((b) => b.date == t.date && b.lot == t.lot && b.qty != null).firstOrNull;
+          if (b != null) {
+            b.qty = b.qty! + (t.qty ?? 0);
+          } else {
+            it.expiries.add(ExpiryBatch(date: t.date, qty: t.qty, lot: t.lot));
+            it.expiries.sort((a, b) => a.date.compareTo(b.date));
+          }
+        }
+        l.taken = null;
+      }
+    }
+  }
+
   void saveReceipt(Receipt r, {int? replacingNo}) {
     r.by = cloud?.who ?? r.by;
+    final old = receipts.where((x) => x.no == (replacingNo ?? r.no)).firstOrNull;
+    r.at = old?.at ?? r.at ?? DateTime.now().toUtc().toIso8601String();
+    r.review = cloud?.isStaff ?? false; // the owner saving it is the check
+    if (old != null) _issueExpiries(old, take: false);
+    _issueExpiries(r, take: true);
     receipts.removeWhere((x) => x.no == (replacingNo ?? r.no));
     receipts.add(r);
     receipts.sort((a, b) => a.no.compareTo(b.no));
@@ -491,6 +588,9 @@ class WarehouseStore extends ChangeNotifier {
   }
 
   void deleteReceipt(int no) {
+    for (final r in receipts.where((r) => r.no == no)) {
+      _issueExpiries(r, take: false);
+    }
     receipts.removeWhere((r) => r.no == no);
     _changed();
   }

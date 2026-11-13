@@ -1,21 +1,38 @@
 rules_version = '2';
 
-// Rules for the hospital store's shared data. Paste into Firebase console → Firestore → Rules.
+// Rules for the hospital store's shared data. Paste into Firebase console → Firestore → Rules → Publish.
 // Only people in the "members" list can read or change the data; only an owner can change the list.
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null && request.auth.token.email != null; }
     function memberDoc() { return /databases/$(db)/documents/members/$(request.auth.token.email); }
     function isMember() { return signedIn() && exists(memberDoc()); }
-    function isOwner() { return isMember() && get(memberDoc()).data.role == 'owner'; }
+    function role() { return get(memberDoc()).data.role; }
+    function isOwner() { return isMember() && role() == 'owner'; }
 
+    // The shared data. Every save must say truthfully who made it, may not be emptied out, and
+    // only an owner may delete it.
     match /stores/{store} {
-      allow read, write: if isMember();
+      allow read: if isMember();
+      allow create, update: if isMember()
+                            && request.resource.data.keys().hasAll(['data', 'updatedBy'])
+                            && request.resource.data.updatedBy == request.auth.token.email
+                            && request.resource.data.data is bytes
+                            && request.resource.data.data.size() > 100;
+      allow delete: if isOwner();
+    }
+
+    // One copy of the shared data per day, kept 30 days. Only an owner's device writes or reads them.
+    match /backups/{day} {
+      allow read, write: if isOwner();
     }
 
     match /members/{email} {
       allow read: if isMember();
-      allow write: if isOwner();
+      // Only an owner changes the team, and only to one of the three known roles.
+      allow create, update: if isOwner() && request.resource.data.role in ['owner', 'staff', 'dept'];
+      // An owner cannot remove themselves (the store would have no owner left).
+      allow delete: if isOwner() && email != request.auth.token.email;
       // First-time setup: the person who sets up the store becomes its owner. Closed for good
       // once the shared data exists.
       allow create: if signedIn() && email == request.auth.token.email

@@ -19,7 +19,9 @@ import 'screens/payments_screen.dart';
 import 'screens/profit_screen.dart';
 import 'screens/purchase_screens.dart';
 import 'screens/receipt_screens.dart';
+import 'screens/labels_screen.dart';
 import 'screens/reports_screen.dart';
+import 'screens/request_screens.dart';
 import 'screens/reserve_screens.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stock_screen.dart';
@@ -132,6 +134,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     ]),
     _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
       ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
+      ('Requests', 'طلبات الأقسام', (s, _) => RequestsScreen(store: s)),
       ('Departments', 'الأقسام', (s, _) => DepartmentsScreen(store: s)),
     ]),
     _Section('Stock', 'المخزون', Icons.inventory_2_outlined, Icons.inventory_2, [
@@ -139,6 +142,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Reorder', 'إعادة الطلب', (s, _) => ReorderScreen(store: s)),
       ('Expiry', 'الصلاحية', (s, _) => ExpiryScreen(store: s)),
       ('Reports', 'التقارير', (s, _) => ReportsScreen(store: s)),
+      ('Barcodes', 'الباركود', (s, _) => LabelsScreen(store: s)),
     ]),
     // Stock counts of both stores, each on its own page.
     _Section('Count', 'الجرد', Icons.fact_check_outlined, Icons.fact_check, [
@@ -177,6 +181,17 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   static final _staffSections = <_Section>[
     _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
       ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
+      ('Requests', 'طلبات الأقسام', (s, _) => RequestsScreen(store: s)),
+    ]),
+    _Section('Account', 'الحساب', Icons.person_outline, Icons.person, [
+      ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
+    ]),
+  ];
+
+  /// A department login only sends requests to the store.
+  static final _deptSections = <_Section>[
+    _Section('Requests', 'الطلبات', Icons.assignment_outlined, Icons.assignment, [
+      ('Requests', 'طلباتي', (s, _) => RequestsScreen(store: s)),
     ]),
     _Section('Account', 'الحساب', Icons.person_outline, Icons.person, [
       ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
@@ -213,7 +228,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   }
 
   bool get _staff => widget.store.cloud?.isStaff ?? false;
-  List<_Section> get _secs => _staff ? _staffSections : _sections;
+  List<_Section> get _secs => (widget.store.cloud?.isDept ?? false) ? _deptSections : _staff ? _staffSections : _sections;
 
   @override
   void go(String section, [int page = 0]) {

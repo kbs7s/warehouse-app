@@ -6,6 +6,7 @@ import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
+import 'scan.dart';
 
 /// Stock count of the main store (or the reserve store): one item at a time, then the shortfall is issued to departments.
 class StockCountScreen extends StatefulWidget {
@@ -66,8 +67,10 @@ class _StockCountScreenState extends State<StockCountScreen> {
       return Scaffold(
         appBar: appBar,
         body: PageBody(children: [
-          EmptyState(
-            icon: Icons.fact_check_outlined,
+          _CountStart(
+            store: s,
+            reserve: reserve,
+            items: items,
             title: reserve
                 ? tx('Count the reserve store item by item', 'جرد مخزن الاحتياط مادة بمادة')
                 : tx('Count the main store item by item', 'جرد المخزن الأساسي مادة بمادة'),
@@ -122,6 +125,17 @@ class _StockCountScreenState extends State<StockCountScreen> {
               }
             },
             child: Text(tx('Cancel count', 'إلغاء الجرد')),
+          ),
+          IconButton.filledTonal(
+            tooltip: tx('Scan an item to count it', 'اقرأ باركود مادة لجردها'),
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              final id = await scanItem(context, s);
+              if (id == null || !context.mounted) return;
+              final k = items.indexWhere((i) => i.id == id);
+              if (k < 0) return toast(context, tx('That item is not in this count.', 'هذه المادة ليست ضمن هذا الجرد.'));
+              setState(() => _show(k));
+            },
           ),
         ]),
         const SizedBox(height: 6),
@@ -324,5 +338,83 @@ class _CountReviewState extends State<_CountReview> {
         ),
       ]),
     );
+  }
+}
+
+/// Before a count starts: what the count does, the start button, and the items whose balance in
+/// the app is already wrong (below zero), so they are checked first.
+class _CountStart extends StatelessWidget {
+  const _CountStart({required this.store, required this.reserve, required this.items, required this.title, required this.message, required this.action});
+  final WarehouseStore store;
+  final bool reserve;
+  final List<Item> items;
+  final String title, message;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    num inApp(Item i) => reserve ? store.stock(i.id).reserve : store.stock(i.id).qty;
+    final wrong = [for (final i in items) if (inApp(i) < 0) i];
+    final out = items.where((i) => inApp(i) == 0).length;
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    Widget figure(String label, String value, {Color? color}) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant)),
+            Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
+          ]),
+        );
+    final intro = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: t.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text(message, style: TextStyle(color: t.colorScheme.onSurface, height: 1.5)),
+          const SizedBox(height: 18),
+          Row(children: [
+            figure(tx('Items to count', 'مواد للجرد'), '${items.length}'),
+            figure(tx('At zero in the app', 'رصيدها صفر'), '$out'),
+            figure(tx('Below zero', 'رصيد سالب'), '${wrong.length}', color: wrong.isEmpty ? null : t.colorScheme.bad),
+          ]),
+          const SizedBox(height: 18),
+          action,
+        ]),
+      ),
+    );
+    final check = Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(tx('Check these first', 'ابدأ بتدقيق هذه'), style: t.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(
+              wrong.isEmpty
+                  ? tx('No item has a balance below zero.', 'لا توجد مادة رصيدها أقل من صفر.')
+                  : tx('The app shows less than nothing for these, so an issue or purchase was recorded wrong. The count puts them right.',
+                      'التطبيق يُظهر رصيداً أقل من الصفر لهذه المواد، أي أن صرفاً أو شراءً سُجِّل خطأً. الجرد يصحّحها.'),
+              style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          for (final i in wrong.take(8))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(children: [
+                Expanded(child: NameText(i.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                Text('${fmtQty(inApp(i))} ', style: TextStyle(fontWeight: FontWeight.w800, color: t.colorScheme.bad)),
+                NameText(i.unit, style: t.textTheme.bodySmall),
+              ]),
+            ),
+          if (wrong.length > 8)
+            Text(tx('and ${wrong.length - 8} more', 'و${wrong.length - 8} مواد أخرى'), style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+        ]),
+      ),
+    );
+    return wide
+        ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(flex: 3, child: intro),
+            const SizedBox(width: 16),
+            Expanded(flex: 2, child: check),
+          ])
+        : Column(children: [intro, const SizedBox(height: 12), check]);
   }
 }

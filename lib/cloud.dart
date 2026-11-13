@@ -52,11 +52,13 @@ class CloudUser {
 }
 
 class Member {
-  Member({required this.email, this.name = '', this.role = 'staff'});
+  Member({required this.email, this.name = '', this.role = 'staff', this.department = ''});
   final String email;
   final String name;
-  final String role; // 'owner' or 'staff'
+  final String role; // 'owner', 'staff', or 'dept' (a department that sends requests)
+  final String department; // for 'dept': the department this login asks for
   bool get isOwner => role == 'owner';
+  bool get isDept => role == 'dept';
 }
 
 /// The shared data as last saved online.
@@ -158,6 +160,9 @@ class CloudClient {
     return j;
   }
 
+  /// A fresh sign-in token (tests use it to call the database directly).
+  Future<String> idToken() => _token();
+
   // ---- Documents ----
 
   Future<Map<String, String>> _headers() async =>
@@ -209,6 +214,55 @@ class CloudClient {
     return ((j['writeResults'] as List).first as Map)['updateTime'] as String;
   }
 
+  // ---- Daily copies ----
+
+  /// Saves today's copy of the shared data as backups/[day] (yyyy-MM-dd), replacing an earlier copy of the same day.
+  Future<void> saveBackup(String day, Map<String, dynamic> data) async {
+    final packed = base64Encode(const GZipEncoder().encodeBytes(utf8.encode(jsonEncode(data))));
+    final res = await _send(() async => _http.patch(Uri.parse('${config._docsBase}/backups/$day'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'fields': {
+            'data': {'bytesValue': packed},
+            'savedBy': {'stringValue': user?.email ?? ''},
+            'savedAt': {'timestampValue': DateTime.now().toUtc().toIso8601String()},
+          }
+        })));
+    if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);
+  }
+
+  /// The daily copies kept online, newest first: (day, when saved, by whom). The data itself is not downloaded.
+  Future<List<({String day, String savedAt, String savedBy})>> backups() async {
+    final res = await _send(() async => _http.get(
+        Uri.parse('${config._docsBase}/backups?pageSize=100&mask.fieldPaths=savedAt&mask.fieldPaths=savedBy'),
+        headers: await _headers()));
+    final j = _decode(res);
+    if (res.statusCode != 200) throw _error(j, res.statusCode);
+    final out = [
+      for (final d in (j['documents'] as List? ?? []))
+        (
+          day: ((d as Map)['name'] as String).split('/').last,
+          savedAt: ((d['fields'] as Map?)?['savedAt'] as Map?)?['timestampValue'] as String? ?? '',
+          savedBy: ((d['fields'] as Map?)?['savedBy'] as Map?)?['stringValue'] as String? ?? '',
+        ),
+    ];
+    return out..sort((a, b) => b.day.compareTo(a.day));
+  }
+
+  /// The shared data as it was saved on [day].
+  Future<Map<String, dynamic>> backup(String day) async {
+    final res = await _send(() async => _http.get(Uri.parse('${config._docsBase}/backups/$day'), headers: await _headers()));
+    final j = _decode(res);
+    if (res.statusCode != 200) throw _error(j, res.statusCode);
+    final bytes = base64Decode((((j['fields'] as Map?)?['data'] as Map?)?['bytesValue'] as String?) ?? '');
+    return jsonDecode(utf8.decode(const GZipDecoder().decodeBytes(bytes))) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteBackup(String day) async {
+    final res = await _send(() async => _http.delete(Uri.parse('${config._docsBase}/backups/$day'), headers: await _headers()));
+    if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);
+  }
+
   Future<List<Member>> members() async {
     final res = await _send(() async => _http.get(Uri.parse('${config._docsBase}/members?pageSize=300'), headers: await _headers()));
     final j = _decode(res);
@@ -233,7 +287,7 @@ class CloudClient {
   Member _member(Map<String, dynamic> d) {
     final f = (d['fields'] as Map<String, dynamic>?) ?? {};
     String s(String k) => ((f[k] as Map?)?['stringValue'] as String?) ?? '';
-    return Member(email: Uri.decodeComponent((d['name'] as String).split('/').last), name: s('name'), role: s('role'));
+    return Member(email: Uri.decodeComponent((d['name'] as String).split('/').last), name: s('name'), role: s('role'), department: s('department'));
   }
 
   Future<void> setMember(Member m) async {
@@ -243,6 +297,7 @@ class CloudClient {
           'fields': {
             'name': {'stringValue': m.name},
             'role': {'stringValue': m.role},
+            if (m.department.isNotEmpty) 'department': {'stringValue': m.department},
           }
         })));
     if (res.statusCode != 200) throw _error(_decode(res), res.statusCode);

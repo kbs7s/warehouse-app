@@ -273,6 +273,12 @@ class CloudCard extends StatelessWidget {
                     icon: const Icon(Icons.group_outlined),
                     label: Text(tx('Team', 'الفريق')),
                   ),
+                if (c.isOwner)
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DailyCopiesScreen(store: store))),
+                    icon: const Icon(Icons.history),
+                    label: Text(tx('Daily copies', 'النسخ اليومية')),
+                  ),
                 OutlinedButton.icon(
                   onPressed: () async {
                     if (await confirm(
@@ -312,8 +318,7 @@ class SyncBadge extends StatelessWidget {
       builder: (_, _) => IconButton(
         tooltip: syncLine(c),
         onPressed: onTap,
-        icon: Icon(syncIcon(c.state), color: Colors.white),
-        style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .14)),
+        icon: Icon(syncIcon(c.state), color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -350,7 +355,7 @@ class _TeamScreenState extends State<TeamScreen> {
   }
 
   Future<void> _add() async {
-    final added = await showDialog<bool>(context: context, builder: (_) => _AddMemberDialog(client: _client));
+    final added = await showDialog<bool>(context: context, builder: (_) => _AddMemberDialog(client: _client, departments: widget.store.departments));
     if (added == true) _load();
   }
 
@@ -394,7 +399,7 @@ class _TeamScreenState extends State<TeamScreen> {
                 ListTile(
                   leading: CircleAvatar(child: Icon(m.isOwner ? Icons.verified_user_outlined : Icons.person_outline)),
                   title: Text(m.name.isEmpty ? m.email : m.name),
-                  subtitle: Text('${m.email} · ${m.isOwner ? tx('Owner', 'المالك') : tx('Team member', 'عضو')}'),
+                  subtitle: Text('${m.email} · ${m.isOwner ? tx('Owner', 'المالك') : m.isDept ? tx('Department: ${m.department}', 'قسم: ${m.department}') : tx('Team member', 'عضو')}'),
                   trailing: m.email == me
                       ? Text(tx('You', 'أنت'))
                       : IconButton(
@@ -409,8 +414,9 @@ class _TeamScreenState extends State<TeamScreen> {
 }
 
 class _AddMemberDialog extends StatefulWidget {
-  const _AddMemberDialog({required this.client});
+  const _AddMemberDialog({required this.client, required this.departments});
   final CloudClient client;
+  final List<String> departments;
 
   @override
   State<_AddMemberDialog> createState() => _AddMemberDialogState();
@@ -420,13 +426,15 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _owner = false;
+  String _role = 'staff';
+  String? _department;
   bool _busy = false;
   String? _error;
 
   Future<void> _save() async {
     final email = _email.text.trim().toLowerCase();
     if (email.isEmpty) return setState(() => _error = tx('Enter their email.', 'أدخل بريده الإلكتروني.'));
+    if (_role == 'dept' && (_department ?? '').isEmpty) return setState(() => _error = tx('Choose the department.', 'اختر القسم.'));
     setState(() {
       _busy = true;
       _error = null;
@@ -451,7 +459,7 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
           if (!ok) return;
         }
       }
-      await widget.client.setMember(Member(email: email, name: _name.text.trim(), role: _owner ? 'owner' : 'staff'));
+      await widget.client.setMember(Member(email: email, name: _name.text.trim(), role: _role, department: _role == 'dept' ? _department! : ''));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => _error = _err(e));
@@ -483,12 +491,21 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            CheckboxListTile(
-              value: _owner,
-              onChanged: (v) => setState(() => _owner = v ?? false),
-              contentPadding: EdgeInsets.zero,
-              title: Text(tx('Owner (can manage the team)', 'مالك (يدير الفريق)')),
-            ),
+            Wrap(spacing: 8, children: [
+              for (final (key, label) in [
+                ('staff', tx('Store staff (issues)', 'كادر المخزن (يصرف)')),
+                ('dept', tx('Department (sends requests)', 'قسم (يرسل طلبات)')),
+                ('owner', tx('Owner', 'مالك')),
+              ])
+                ChoiceChip(label: Text(label), selected: _role == key, onSelected: (_) => setState(() => _role = key)),
+            ]),
+            if (_role == 'dept') ...[
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 4, children: [
+                for (final d in widget.departments)
+                  ChoiceChip(label: NameText(d), selected: _department == d, showCheckmark: false, onSelected: (_) => setState(() => _department = d)),
+              ]),
+            ],
             if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.bad, fontWeight: FontWeight.w600)),
           ]),
         ),
@@ -520,8 +537,119 @@ class AccountScreen extends StatelessWidget {
           const SizedBox(height: 12),
           CloudCard(store: store),
           const SizedBox(height: 12),
-          Text(tx('Your account can issue supplies to departments. Ask the store owner for anything else.',
-              'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
+          Text((store.cloud?.isDept ?? false)
+              ? tx('This login sends requests to the store for ${store.cloud!.department}.', 'هذا الحساب يرسل طلبات إلى المخزن لقسم ${store.cloud!.department}.')
+              : tx('Your account can issue supplies to departments. Ask the store owner for anything else.',
+                  'حسابك يستطيع صرف المواد إلى الأقسام. اطلب من مالك المخزن أي شيء آخر.')),
         ]),
       );
+}
+
+
+/// The online copies of the shared store, one per day for the last 30 days. Any day can be brought
+/// back, for example after a wrong delete; that day's data then replaces the shared store for everyone.
+class DailyCopiesScreen extends StatefulWidget {
+  const DailyCopiesScreen({super.key, required this.store});
+  final WarehouseStore store;
+
+  @override
+  State<DailyCopiesScreen> createState() => _DailyCopiesScreenState();
+}
+
+class _DailyCopiesScreenState extends State<DailyCopiesScreen> {
+  List<({String day, String savedAt, String savedBy})>? _list;
+  String? _error;
+  bool _busy = false;
+
+  CloudClient get _client => widget.store.cloud!.client!;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final l = await _client.backups();
+      if (mounted) setState(() => _list = l);
+    } catch (e) {
+      if (mounted) setState(() => _error = e is CloudError && e.code == 'PERMISSION_DENIED' ? 'PERMISSION' : _err(e));
+    }
+  }
+
+  Future<void> _restore(String day) async {
+    if (!await confirm(
+        context,
+        tx('Bring back ${fmtDate(day)}?', 'استرجاع نسخة ${fmtDate(day)}؟'),
+        tx('The shared store goes back to how it was at the end of that day, for everyone. Everything entered after it is removed. '
+                'Today\'s copy is kept, so you can come back to it.',
+            'يعود المخزن المشترك كما كان في نهاية ذلك اليوم، لكل الفريق. كل ما أُدخل بعده سيُحذف. '
+                'نسخة اليوم تبقى محفوظة، فيمكنك الرجوع إليها.'),
+        action: tx('Bring it back', 'استرجاع'))) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final data = await _client.backup(day);
+      widget.store.applyJson(data);
+      await widget.store.cloud!.syncNow();
+      if (mounted) {
+        toast(context, tx('The store is back to ${fmtDate(day)}.', 'عاد المخزن إلى ${fmtDate(day)}.'));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) toast(context, _err(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final l = _list;
+    return Scaffold(
+      appBar: HeaderBar(title: Text(tx('Daily copies', 'النسخ اليومية'))),
+      body: PageBody(maxWidth: 720, children: [
+        Text(
+          tx('The app keeps a copy of the shared store online for each of the last 30 days. Bring one back after a mistake, such as a wrong delete.',
+              'يحفظ التطبيق نسخة من المخزن المشترك أونلاين لكل يوم من آخر 30 يوماً. استرجع إحداها بعد خطأ، مثل حذف بالخطأ.'),
+          style: TextStyle(color: t.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        if (_busy) const LinearProgressIndicator(),
+        if (_error != null)
+          Text(
+            _error == 'PERMISSION'
+                ? tx('The online rules need one update before daily copies can be saved. Paste the new rules in the Firebase console.',
+                    'تحتاج قواعد الخادم تحديثاً واحداً قبل حفظ النسخ اليومية. الصق القواعد الجديدة في لوحة Firebase.')
+                : _error!,
+            style: TextStyle(color: t.colorScheme.bad, fontWeight: FontWeight.w600),
+          )
+        else if (l == null)
+          const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+        else if (l.isEmpty)
+          Text(tx('No copies yet. The first one is saved at the next sync.', 'لا توجد نسخ بعد. تُحفظ الأولى عند المزامنة القادمة.'))
+        else
+          Card(
+            child: Column(children: [
+              for (final b in l)
+                ListTile(
+                  leading: const Icon(Icons.inventory_outlined),
+                  title: Text(fmtDate(b.day), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(tx('Saved ${_time(b.savedAt)}${b.savedBy.isEmpty ? '' : ' · ${b.savedBy}'}',
+                      'حُفظت ${_time(b.savedAt)}${b.savedBy.isEmpty ? '' : ' · ${b.savedBy}'}')),
+                  trailing: OutlinedButton(onPressed: _busy ? null : () => _restore(b.day), child: Text(tx('Bring back', 'استرجاع'))),
+                ),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  static String _time(String iso) {
+    final d = DateTime.tryParse(iso)?.toLocal();
+    return d == null ? '' : '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
 }

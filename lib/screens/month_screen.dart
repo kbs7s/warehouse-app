@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../export.dart';
 import '../l10n.dart';
+import 'send_file.dart';
+import '../pdf.dart';
 import '../month.dart';
 import '../shell.dart';
 import '../store.dart';
@@ -65,6 +67,20 @@ class _MonthScreenState extends State<MonthScreen> {
         bottom: SubNav.bar(context),
         actions: [
           IconButton(
+            tooltip: tx('Month report PDF', 'تقرير الشهر PDF'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => showPdfSheet(context,
+                name: 'Month-report-${from.substring(0, 7)}',
+                make: () => buildMonthReportPdf(s,
+                    title: monthName(from, to),
+                    from: from,
+                    to: to,
+                    rows: rows,
+                    stats: const {},
+                    issues: [for (final r in s.receipts) if ((r.date ?? '').compareTo(from) >= 0) r],
+                    purchases: [for (final p in s.purchases) if ((p.date ?? '').compareTo(from) >= 0) p])),
+          ),
+          IconButton(
             tooltip: tx('Export to Excel', 'تصدير إلى إكسل'),
             icon: const Icon(Icons.table_view_outlined),
             onPressed: () => exportMonthExcel(
@@ -111,7 +127,9 @@ class _MonthScreenState extends State<MonthScreen> {
               icon: Icons.swap_vert,
               hint: tx('of ${rows.length} items', 'من ${rows.length} مادة')),
         ]),
-        SectionTitle(tx('Items this month', 'المواد هذا الشهر'), trailing: Text('${shown.length}')),
+        SectionTitle(tx('Items this month', 'المواد هذا الشهر'), trailing: shown.isEmpty
+                ? null
+                : Text(tx('${shown.length} items', '${shown.length} مادة'), style: TextStyle(color: t.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600))),
         Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           ChoiceChip(
               label: Text(tx('Moved this month', 'تحركت هذا الشهر')),
@@ -173,12 +191,8 @@ class _OpenMonthCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(phone ? 20 : 26),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: heroGradient(),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        color: heroColor(),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(tx('Open month', 'الشهر المفتوح'), style: t.textTheme.labelLarge!.copyWith(color: Colors.white70)),

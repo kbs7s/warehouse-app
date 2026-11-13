@@ -1,10 +1,13 @@
 import 'package:flutter/services.dart';
+import 'package:barcode/barcode.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import 'l10n.dart';
+import 'expiry.dart';
 import 'models.dart';
+import 'month.dart';
 import 'store.dart';
 import 'ui.dart';
 
@@ -328,3 +331,184 @@ Future<void> shareDepartmentsPdf(WarehouseStore store, String from, String to, S
       name: '${title.replaceAll('/', '-')}.pdf',
       onLayout: (_) => buildDepartmentsPdf(store, from, to, title),
     );
+
+
+/// Sticker sheet: one label per item with its name, unit and a barcode (or QR code) of its code,
+/// [copies] of each, on A4 in a grid of 3 across.
+Future<Uint8List> buildLabelsPdf(WarehouseStore store, List<Item> items, {bool qr = false, int copies = 1}) async {
+  final doc = pw.Document(theme: await _pdfTheme(), title: tx('Item labels', 'ملصقات المواد'));
+  final labels = [for (final i in items) for (var k = 0; k < copies; k++) i];
+  pw.Widget label(Item i) => pw.Container(
+        height: 120,
+        padding: const pw.EdgeInsets.all(6),
+        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey500, width: .5), borderRadius: pw.BorderRadius.circular(4)),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+          _name(i.name, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold), align: pw.TextAlign.center),
+          pw.SizedBox(height: 4),
+          pw.Expanded(
+            child: pw.BarcodeWidget(
+              barcode: qr ? Barcode.qrCode() : Barcode.code128(),
+              data: (i.barcode ?? '').isNotEmpty ? i.barcode! : i.id,
+              drawText: false,
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          _name('${(i.barcode ?? '').isNotEmpty ? i.barcode! : i.id} · ${i.unit}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700), align: pw.TextAlign.center),
+        ]),
+      );
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    textDirection: _dir,
+    margin: const pw.EdgeInsets.all(24),
+    build: (_) => [
+      pw.GridView(crossAxisCount: 3, childAspectRatio: 120 / 172, crossAxisSpacing: 8, mainAxisSpacing: 8, children: [for (final i in labels) label(i)]),
+    ],
+  ));
+  return doc.save();
+}
+
+Future<void> shareLabelsPdf(WarehouseStore store, List<Item> items, {bool qr = false, int copies = 1}) => Printing.layoutPdf(
+      name: 'Labels.pdf',
+      onLayout: (_) => buildLabelsPdf(store, items, qr: qr, copies: copies),
+    );
+
+
+/// One-page-or-so month report for management: hospital figures, totals, spending per department,
+/// most used items, items that ran out, and items expiring soon.
+Future<Uint8List> buildMonthReportPdf(WarehouseStore store,
+    {required String title, required String from, required String to, required List<MonthRow> rows,
+    required Map<String, num> stats, required List<Receipt> issues, required List<Purchase> purchases}) async {
+  final doc = pw.Document(theme: await _pdfTheme(), title: title);
+  const cell = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4);
+  final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold);
+  const teal = PdfColor.fromInt(0xFF0F766E);
+  num cost(String id, num q) => store.ledger.estimateCost(id, q);
+
+  // Spending per department: issues, items, and value at cost.
+  final dept = <String, ({int n, num qty, num value})>{};
+  for (final r in issues) {
+    final d = (r.department ?? '').trim().isEmpty ? tx('No department', 'بدون قسم') : r.department!.trim();
+    final old = dept[d] ?? (n: 0, qty: 0, value: 0);
+    dept[d] = (
+      n: old.n + 1,
+      qty: old.qty + r.lines.fold<num>(0, (s, l) => s + l.qty),
+      value: old.value + r.lines.fold<num>(0, (s, l) => s + cost(l.itemId, l.qty)),
+    );
+  }
+  final depts = dept.entries.toList()..sort((a, b) => b.value.value.compareTo(a.value.value));
+  final issuedValue = depts.fold<num>(0, (s, e) => s + e.value.value);
+  final bought = purchases.fold<num>(0, (s, p) => s + p.total);
+  final top = (rows.where((r) => r.issued > 0).toList()..sort((a, b) => b.issued.compareTo(a.issued))).take(10).toList();
+  final ranOut = [for (final r in rows) if (r.closing <= 0 && (r.issued > 0 || r.opening > 0)) r];
+  final expiring = [for (final e in store.expiryAlerts) e].take(15).toList();
+
+  pw.Widget heading(String t) => pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 14, bottom: 6), child: pw.Text(t, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: teal)));
+  pw.Widget table(List<String> head, List<List<String>> body, List<pw.TableColumnWidth> widths, {Set<int> numeric = const {}}) => pw.Table(
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: .5),
+        columnWidths: _widths(widths),
+        children: [
+          pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+              children: _cols([for (final h in head) pw.Padding(padding: cell, child: pw.Text(h, style: bold))])),
+          for (final row in body)
+            pw.TableRow(children: _cols([
+              for (final (i, v) in row.indexed)
+                pw.Padding(padding: cell, child: numeric.contains(i) ? pw.Text(v, textAlign: _num) : _name(v)),
+            ])),
+        ],
+      );
+  pw.Widget tile(String label, String value) => pw.Expanded(
+        child: pw.Container(
+          margin: const pw.EdgeInsets.symmetric(horizontal: 3),
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(6)),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+            pw.Text(value, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          ]),
+        ),
+      );
+
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    textDirection: _dir,
+    margin: const pw.EdgeInsets.all(32),
+    header: (_) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(tx('Month report · $title', 'تقرير الشهر · $title'), style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: teal)),
+        _name(store.companyName.isEmpty ? 'قسم التجهيز' : store.companyName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+      ]),
+      pw.Text('${fmtDate(from)} – ${fmtDate(to)}', style: const pw.TextStyle(color: PdfColors.grey700)),
+      pw.Divider(color: PdfColors.grey400),
+    ]),
+    footer: (c) => pw.Align(
+        alignment: _end,
+        child: pw.Text(tx('$title · page ${c.pageNumber} of ${c.pagesCount}', '$title · صفحة ${c.pageNumber} من ${c.pagesCount}'),
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600))),
+    build: (_) => [
+      pw.Row(children: [
+        tile(tx('Issue receipts', 'وصولات الصرف'), '${issues.length}'),
+        tile(tx('Supplies used (cost)', 'قيمة المصروف'), fmtMoney(issuedValue)),
+        tile(tx('Purchases', 'المشتريات'), '${purchases.length} · ${fmtMoney(bought)}'),
+        tile(tx('Items that ran out', 'مواد نفدت'), '${ranOut.length}'),
+      ]),
+      if (stats.isNotEmpty) ...[
+        heading(tx('Hospital figures', 'أرقام المستشفى')),
+        pw.Row(children: [
+          for (final k in monthStatKeys) tile(tx(k.$2, k.$3), stats[k.$1] == null ? '—' : fmtQty(stats[k.$1]!)),
+        ]),
+      ],
+      heading(tx('Spending per department', 'الصرف حسب القسم')),
+      if (depts.isEmpty)
+        pw.Text(tx('No issues this month.', 'لا يوجد صرف هذا الشهر.'))
+      else
+        table(
+          [tx('Department', 'القسم'), tx('Receipts', 'الوصولات'), tx('Quantity', 'الكمية'), tx('Value', 'القيمة'), '%'],
+          [
+            for (final e in depts)
+              [
+                e.key,
+                '${e.value.n}',
+                fmtQty(e.value.qty),
+                fmtMoney(e.value.value),
+                issuedValue == 0 ? '—' : '${(e.value.value * 100 / issuedValue).round()}%',
+              ],
+          ],
+          const [pw.FlexColumnWidth(), pw.FixedColumnWidth(70), pw.FixedColumnWidth(70), pw.FixedColumnWidth(100), pw.FixedColumnWidth(40)],
+          numeric: {1, 2, 3, 4},
+        ),
+      heading(tx('Most used items', 'المواد الأكثر استخداماً')),
+      if (top.isEmpty)
+        pw.Text('—')
+      else
+        table(
+          [tx('Item', 'المادة'), tx('Used', 'المصروف'), tx('Unit', 'الوحدة'), tx('Left at month end', 'الباقي نهاية الشهر')],
+          [for (final r in top) [r.name, fmtQty(r.issued), r.unit, fmtQty(r.closing)]],
+          const [pw.FlexColumnWidth(), pw.FixedColumnWidth(70), pw.FixedColumnWidth(70), pw.FixedColumnWidth(100)],
+          numeric: {1, 3},
+        ),
+      heading(tx('Items that ran out', 'المواد التي نفدت')),
+      if (ranOut.isEmpty)
+        pw.Text(tx('None.', 'لا يوجد.'))
+      else
+        table(
+          [tx('Item', 'المادة'), tx('Used this month', 'المصروف هذا الشهر'), tx('Left', 'الباقي')],
+          [for (final r in ranOut) [r.name, fmtQty(r.issued), fmtQty(r.closing)]],
+          const [pw.FlexColumnWidth(), pw.FixedColumnWidth(110), pw.FixedColumnWidth(70)],
+          numeric: {1, 2},
+        ),
+      heading(tx('Expired or expiring soon (today)', 'منتهية أو قريبة الانتهاء (اليوم)')),
+      if (expiring.isEmpty)
+        pw.Text(tx('None.', 'لا يوجد.'))
+      else
+        table(
+          [tx('Item', 'المادة'), tx('Expiry date', 'تاريخ الانتهاء'), tx('Quantity', 'الكمية'), tx('Status', 'الحالة')],
+          [for (final e in expiring) [e.item.name, fmtDate(e.batch.date), e.batch.qty == null ? '—' : fmtQty(e.batch.qty!), e.label]],
+          const [pw.FlexColumnWidth(), pw.FixedColumnWidth(90), pw.FixedColumnWidth(70), pw.FixedColumnWidth(110)],
+          numeric: {2},
+        ),
+    ],
+  ));
+  return doc.save();
+}

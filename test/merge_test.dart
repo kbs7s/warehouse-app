@@ -30,6 +30,18 @@ void main() {
     expect(m['receipts'], [rec(1, 'ICU'), rec(2, 'NICU'), rec(3, 'OR'), rec(4, 'ER')]);
   });
 
+  test('the receipt written first keeps a number both devices used', () {
+    Map<String, dynamic> at(int no, String dep, String t) => {'no': no, 'department': dep, 'at': t};
+    final base = d(receipts: [rec(1, 'ICU')]);
+    final local = d(receipts: [rec(1, 'ICU'), at(2, 'ER', '2026-11-12T08:00:00Z')]); // written offline, earlier
+    final remote = d(receipts: [rec(1, 'ICU'), at(2, 'NICU', '2026-11-12T09:00:00Z')]);
+    expect(mergeData(base, local, remote)['receipts'],
+        [rec(1, 'ICU'), at(2, 'ER', '2026-11-12T08:00:00Z'), at(3, 'NICU', '2026-11-12T09:00:00Z')]);
+    final late = d(receipts: [rec(1, 'ICU'), at(2, 'ER', '2026-11-12T10:00:00Z')]);
+    expect(mergeData(base, late, remote)['receipts'],
+        [rec(1, 'ICU'), at(2, 'NICU', '2026-11-12T09:00:00Z'), at(3, 'ER', '2026-11-12T10:00:00Z')]);
+  });
+
   test('a delete on one side and no change on the other removes it; an edit beats a delete', () {
     final base = d(receipts: [rec(1, 'ICU'), rec(2, 'ER')]);
     final local = d(receipts: [rec(2, 'ER')]);

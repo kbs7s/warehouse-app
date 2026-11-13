@@ -17,6 +17,7 @@ class Item {
     this.openingUnitCost,
     this.openingReserve = 0,
     this.reserveOnly = false,
+    this.barcode,
     List<ExpiryBatch>? expiries,
   }) : expiries = expiries ?? [];
 
@@ -33,6 +34,7 @@ class Item {
   List<ExpiryBatch> expiries; // expiry dates of the stock on hand, entered by hand
   num openingReserve; // part of openingQty that starts in the reserve (emergency) store
   bool reserveOnly; // kept only in the reserve store: hidden from the main store's lists and count
+  String? barcode; // the maker's barcode on the box, when it has one (the item code always works too)
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         id: j['id'] as String,
@@ -47,6 +49,7 @@ class Item {
         openingUnitCost: j['openingUnitCost'] as num?,
         openingReserve: _n(j['openingReserve']),
         reserveOnly: j['reserveOnly'] == true,
+        barcode: j['barcode'] as String?,
         expiries: [for (final e in (j['expiries'] as List? ?? [])) ExpiryBatch.fromJson(e as Map<String, dynamic>)],
       );
 
@@ -63,6 +66,7 @@ class Item {
         'openingUnitCost': openingUnitCost,
         if (openingReserve != 0) 'openingReserve': openingReserve,
         if (reserveOnly) 'reserveOnly': true,
+        if (barcode != null) 'barcode': barcode,
         if (expiries.isNotEmpty) 'expiries': [for (final e in expiries) e.toJson()],
       };
 }
@@ -91,18 +95,26 @@ class Customer {
 }
 
 class ReceiptLine {
-  ReceiptLine({required this.itemId, required this.qty});
+  ReceiptLine({required this.itemId, required this.qty, this.taken});
   String itemId;
   num qty;
+  List<ExpiryBatch>? taken; // the expiry batches this line was taken from, soonest first
 
-  factory ReceiptLine.fromJson(Map<String, dynamic> j) =>
-      ReceiptLine(itemId: j['itemId'] as String, qty: _n(j['qty']));
-  Map<String, dynamic> toJson() => {'itemId': itemId, 'qty': qty};
+  factory ReceiptLine.fromJson(Map<String, dynamic> j) => ReceiptLine(
+        itemId: j['itemId'] as String,
+        qty: _n(j['qty']),
+        taken: j['taken'] == null ? null : [for (final b in j['taken'] as List) ExpiryBatch.fromJson(b as Map<String, dynamic>)],
+      );
+  Map<String, dynamic> toJson() => {
+        'itemId': itemId,
+        'qty': qty,
+        if (taken != null && taken!.isNotEmpty) 'taken': [for (final b in taken!) b.toJson()],
+      };
 }
 
 /// An issue of items from the store to a hospital department.
 class Receipt {
-  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false, this.by})
+  Receipt({required this.no, this.date, this.department, this.customer, this.note, List<ReceiptLine>? lines, this.fromReserve = false, this.by, this.at, this.review = false})
       : lines = lines ?? [];
   int no;
   String? date; // yyyy-MM-dd
@@ -112,6 +124,8 @@ class Receipt {
   List<ReceiptLine> lines;
   bool fromReserve; // an emergency issue taken from the reserve store
   String? by; // who saved it last, when signed in to the shared store
+  String? at; // when it was first written; decides who keeps a number two devices both used
+  bool review; // written by a team member and waiting for the owner to check it
 
   factory Receipt.fromJson(Map<String, dynamic> j) => Receipt(
         no: (j['no'] as num).toInt(),
@@ -122,6 +136,8 @@ class Receipt {
         lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
         fromReserve: j['fromReserve'] == true,
         by: j['by'] as String?,
+        at: j['at'] as String?,
+        review: j['review'] == true,
       );
   Map<String, dynamic> toJson() => {
         'no': no,
@@ -132,6 +148,51 @@ class Receipt {
         'lines': [for (final l in lines) l.toJson()],
         if (fromReserve) 'fromReserve': true,
         if (by != null) 'by': by,
+        if (at != null) 'at': at,
+        if (review) 'review': true,
+      };
+}
+
+/// What a department asks the store for. The store turns it into an issue receipt.
+class StoreRequest {
+  StoreRequest({required this.no, this.date, this.department, this.note, List<ReceiptLine>? lines, this.status = 'open', this.given, this.receiptNo, this.by, this.at})
+      : lines = lines ?? [];
+  int no;
+  String? date; // yyyy-MM-dd
+  String? department;
+  String? note;
+  List<ReceiptLine> lines; // what was asked for
+  String status; // 'open', 'done' or 'rejected'
+  List<ReceiptLine>? given; // what the store issued for it
+  int? receiptNo; // the issue receipt made from it
+  String? by; // who asked
+  String? at; // when it was written
+
+  bool get open => status == 'open';
+
+  factory StoreRequest.fromJson(Map<String, dynamic> j) => StoreRequest(
+        no: (j['no'] as num).toInt(),
+        date: j['date'] as String?,
+        department: j['department'] as String?,
+        note: j['note'] as String?,
+        lines: [for (final l in (j['lines'] as List? ?? [])) ReceiptLine.fromJson(l as Map<String, dynamic>)],
+        status: (j['status'] as String?) ?? 'open',
+        given: j['given'] == null ? null : [for (final l in j['given'] as List) ReceiptLine.fromJson(l as Map<String, dynamic>)],
+        receiptNo: (j['receiptNo'] as num?)?.toInt(),
+        by: j['by'] as String?,
+        at: j['at'] as String?,
+      );
+  Map<String, dynamic> toJson() => {
+        'no': no,
+        'date': date,
+        'department': department,
+        if (note != null) 'note': note,
+        'lines': [for (final l in lines) {'itemId': l.itemId, 'qty': l.qty}],
+        'status': status,
+        if (given != null) 'given': [for (final l in given!) {'itemId': l.itemId, 'qty': l.qty}],
+        if (receiptNo != null) 'receiptNo': receiptNo,
+        if (by != null) 'by': by,
+        if (at != null) 'at': at,
       };
 }
 
