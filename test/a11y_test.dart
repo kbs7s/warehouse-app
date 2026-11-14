@@ -26,6 +26,8 @@ void main() {
         await t.pumpWidget(MaterialApp(
             theme: buildTheme(dark ? Brightness.dark : Brightness.light), home: HomeShell(store: store)));
         if (section != 'Home') {
+          await t.tap(find.byTooltip('Menu').first);
+          await t.pumpAndSettle();
           await t.tap(find.text(section).last);
         }
         await t.pumpAndSettle();

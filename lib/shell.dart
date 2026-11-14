@@ -27,6 +27,8 @@ import 'screens/settings_screen.dart';
 import 'screens/stock_screen.dart';
 import 'screens/supplier_screens.dart';
 import 'store.dart';
+import 'theme.dart';
+import 'ui.dart';
 
 /// Sub-page chips shown under a section's title (e.g. Invoices | Clients).
 class SubNav extends InheritedWidget {
@@ -97,14 +99,13 @@ class SubNav extends InheritedWidget {
 }
 
 class _Section {
-  const _Section(this.key, this.ar, this.icon, this.selectedIcon, this.pages, {this.wideOnly = false, this.hidden = false});
+  const _Section(this.key, this.ar, this.icon, this.selectedIcon, this.pages, {this.hidden = false});
   /// Stable English name used by [Shell.go], whatever the interface language.
   final String key;
   final String ar;
   final IconData icon, selectedIcon;
   final List<(String, String, Widget Function(WarehouseStore, Shell))> pages;
   String get label => tx(key, ar);
-  final bool wideOnly;
 
   /// Not in the navigation: opened as a page from elsewhere (Settings, home tiles).
   final bool hidden;
@@ -161,13 +162,13 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     _Section('Reserve', 'الاحتياط', Icons.warehouse_outlined, Icons.warehouse, [
       ('Reserve store', 'مخزن الاحتياط', (s, _) => ReserveScreen(store: s)),
       ('Moves', 'النقل', (s, _) => TransfersScreen(store: s)),
-    ], wideOnly: true),
+    ]),
     _Section('Equipment', 'المعدات', Icons.medical_services_outlined, Icons.medical_services, [
       ('Equipment', 'المعدات', (s, _) => EquipmentScreen(store: s)),
-    ], wideOnly: true),
+    ]),
     _Section('Settings', 'الإعدادات', Icons.settings_outlined, Icons.settings, [
       ('Settings', 'الإعدادات', (s, sh) => SettingsScreen(store: s, shell: sh)),
-    ], wideOnly: true),
+    ]),
     // Selling to clients: kept for older data, opened from Settings.
     _Section('Money', 'المبيعات والمصاريف', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, [
       ('Overview', 'نظرة عامة', (s, _) => ProfitScreen(store: s)),
@@ -234,9 +235,8 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   void go(String section, [int page = 0]) {
     final i = _secs.indexWhere((s) => s.key == section);
     if (i < 0) return;
-    // Phones have no tab for wide-only sections (Equipment, Settings), and hidden ones have none anywhere:
-    // open them as a page instead.
-    if (_secs[i].hidden || (_secs[i].wideOnly && MediaQuery.sizeOf(context).width < 700)) {
+    // Hidden sections have no place in the side panel: open them as a page instead.
+    if (_secs[i].hidden) {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => _SectionPage(section: _secs[i], page: page, store: widget.store, shell: this)));
       return;
     }
@@ -257,82 +257,242 @@ class _HomeShellState extends State<HomeShell> implements Shell {
         InsightTarget.settings => go('Settings'),
       };
 
+  final _scaffold = GlobalKey<ScaffoldState>();
+
+  /// Wide screens: whether the side panel shows names (open) or only icons. Null until the user toggles it.
+  bool? _panelOpen;
+
+  void _select(int i) {
+    setState(() => _section = i);
+    // On a phone the panel slides over the page: close it once a section is picked.
+    if (_scaffold.currentState?.isDrawerOpen ?? false) Navigator.of(context).pop();
+  }
+
+  Future<void> _signOut() async {
+    final c = widget.store.cloud;
+    if (c == null) return;
+    if (_scaffold.currentState?.isDrawerOpen ?? false) Navigator.of(context).pop();
+    if (await confirm(
+        context,
+        tx('Sign out?', 'تسجيل الخروج؟'),
+        tx('The shared data is removed from this device. It stays online for the rest of the team.',
+            'ستُحذف البيانات المشتركة من هذا الجهاز، وتبقى أونلاين لبقية الفريق.'),
+        action: tx('Sign out', 'تسجيل الخروج'))) {
+      await c.syncNow();
+      await c.signOut();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final phone = w < 700;
     final sections = _secs;
     if (_section >= sections.length || sections[_section].hidden) _section = 0;
-    final visible = [for (final (i, s) in sections.indexed) if (!s.hidden && (!phone || !s.wideOnly)) i];
+    final visible = [for (final (i, s) in sections.indexed) if (!s.hidden) i];
     final sec = sections[_section];
     final pageIdx = _page[_section] ?? 0;
-    final body = SubNav(
-      labels: [for (final p in sec.pages) tx(p.$1, p.$2)],
-      index: pageIdx,
-      onSelect: (i) => setState(() => _page[_section] = i),
-      child: ListenableBuilder(
-        listenable: widget.store,
-        builder: (_, _) => KeyedSubtree(
-          key: ValueKey('$_section/$pageIdx'),
-          child: sec.pages[pageIdx].$3(widget.store, this),
+    final open = _panelOpen ?? w >= 1100;
+    final body = MenuScope(
+      onMenu: phone ? () => _scaffold.currentState?.openDrawer() : () => setState(() => _panelOpen = !open),
+      child: SubNav(
+        labels: [for (final p in sec.pages) tx(p.$1, p.$2)],
+        index: pageIdx,
+        onSelect: (i) => setState(() => _page[_section] = i),
+        child: ListenableBuilder(
+          listenable: widget.store,
+          builder: (_, _) => KeyedSubtree(
+            key: ValueKey('$_section/$pageIdx'),
+            child: sec.pages[pageIdx].$3(widget.store, this),
+          ),
         ),
       ),
     );
 
+    // Settings sits apart at the bottom of the panel, with Sign out.
+    final settings = sections.indexWhere((s) => s.key == 'Settings');
+    final panel = _SidePanel(
+      title: widget.store.companyName.isEmpty ? 'قسم التجهيز' : widget.store.companyName,
+      entries: [for (final i in visible) if (i != settings) (i, sections[i])],
+      bottom: [if (settings >= 0) (settings, sections[settings])],
+      selected: _section,
+      open: phone || open,
+      onSelect: _select,
+      onSignOut: (widget.store.cloud?.signedIn ?? false) ? _signOut : null,
+    );
+
     if (phone) {
-      final navIdx = visible.indexOf(_section);
       return Scaffold(
+        key: _scaffold,
+        drawer: Drawer(
+          width: 300,
+          backgroundColor: Colors.transparent,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadiusDirectional.horizontal(end: Radius.circular(24))),
+          clipBehavior: Clip.antiAlias,
+          child: panel,
+        ),
         body: body,
-        bottomNavigationBar: navIdx < 0
-            ? null
-            : NavigationBar(
-                selectedIndex: navIdx,
-                height: 68,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                onDestinationSelected: (i) => setState(() => _section = visible[i]),
-                destinations: [
-                  for (final i in visible)
-                    NavigationDestination(
-                        icon: Icon(sections[i].icon), selectedIcon: Icon(sections[i].selectedIcon), label: sections[i].label),
-                ],
-              ),
       );
     }
-
-    final extended = w >= 1180;
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Row(children: [
-        NavigationRail(
-          extended: extended,
-          minExtendedWidth: 220,
-          selectedIndex: visible.indexOf(_section),
-          onDestinationSelected: (i) => setState(() => _section = visible[i]),
-          labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
-          leading: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-            child: extended
+      key: _scaffold,
+      body: Row(children: [panel, Expanded(child: body)]),
+    );
+  }
+}
+
+/// The dark side panel listing the sections: the open one is a light rounded pill.
+/// Open it shows icons with names; closed (wide screens only) a narrow strip of icons with short names.
+class _SidePanel extends StatelessWidget {
+  const _SidePanel({
+    required this.title,
+    required this.entries,
+    required this.bottom,
+    required this.selected,
+    required this.open,
+    required this.onSelect,
+    required this.onSignOut,
+  });
+  final String title;
+  final List<(int, _Section)> entries, bottom;
+  final int selected;
+  final bool open;
+  final ValueChanged<int> onSelect;
+  final VoidCallback? onSignOut;
+
+  static const _openWidth = 260.0, _closedWidth = 92.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final dir = Directionality.of(context);
+    final width = open ? _openWidth : _closedWidth;
+    Widget item(int i, _Section s) => _PanelItem(
+        icon: i == selected ? s.selectedIcon : s.icon, label: s.label, selected: i == selected, open: open, onTap: () => onSelect(i));
+    final line = Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 16), color: const Color(0x1FFFFFFF));
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: width,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: AppColors.header,
+        ),
+      ),
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: AlignmentDirectional.topStart.resolve(dir),
+          minWidth: width,
+          maxWidth: width,
+          child: SafeArea(
+            right: dir == TextDirection.ltr,
+            left: dir == TextDirection.rtl,
+            child: Column(children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(open ? 18 : 0, 18, open ? 18 : 0, 16),
+                child: open
+                    ? Row(children: [
+                        const _Logo(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                            Text(title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, height: 1.3)),
+                            Text(tx('Store management', 'إدارة المخزن'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13, height: 1.3)),
+                          ]),
+                        ),
+                      ])
+                    : const Center(child: _Logo()),
+              ),
+              line,
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  children: [for (final (i, s) in entries) item(i, s)],
+                ),
+              ),
+              if (bottom.isNotEmpty || onSignOut != null) ...[
+                line,
+                const SizedBox(height: 8),
+                for (final (i, s) in bottom) item(i, s),
+                if (onSignOut != null)
+                  _PanelItem(icon: Icons.logout, label: tx('Sign out', 'تسجيل الخروج'), selected: false, open: open, onTap: onSignOut!),
+                const SizedBox(height: 12),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelItem extends StatelessWidget {
+  const _PanelItem({required this.icon, required this.label, required this.selected, required this.open, required this.onTap});
+  final IconData icon;
+  final String label;
+  final bool selected, open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final dark = t.brightness == Brightness.dark;
+    // The open section's pill takes the page colour, so it reads as joined to the page.
+    final pill = t.scaffoldBackgroundColor;
+    final fg = selected ? (dark ? const Color(0xFF5EEAD4) : const Color(0xFF134E4A)) : const Color(0xF2FFFFFF);
+    final iconColor = selected ? (dark ? const Color(0xFF5EEAD4) : AppColors.brand) : const Color(0xE6FFFFFF);
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(open ? 16 : 14));
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: open ? 12 : 10, vertical: 2),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: selected ? pill : Colors.transparent,
+          shape: shape,
+          child: InkWell(
+            customBorder: shape,
+            onTap: onTap,
+            hoverColor: const Color(0x14FFFFFF),
+            splashColor: const Color(0x22FFFFFF),
+            child: open
                 ? SizedBox(
-                    width: 190,
+                    height: 52,
                     child: Row(children: [
-                      _Logo(color: scheme.primary),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 16),
+                      Icon(icon, color: iconColor, size: 24),
+                      const SizedBox(width: 16),
                       Expanded(
-                          child: Text(widget.store.companyName.isEmpty ? 'قسم التجهيز' : widget.store.companyName,
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                              overflow: TextOverflow.ellipsis)),
+                        child: Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: fg, fontSize: 16, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
+                      ),
                     ]),
                   )
-                : _Logo(color: scheme.primary),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(children: [
+                      Icon(icon, color: iconColor, size: 24),
+                      const SizedBox(height: 2),
+                      Text(label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: fg, fontSize: 12, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
+                    ]),
+                  ),
           ),
-          destinations: [
-            for (final s in [for (final i in visible) sections[i]])
-              NavigationRailDestination(icon: Icon(s.icon), selectedIcon: Icon(s.selectedIcon), label: Text(s.label)),
-          ],
         ),
-        const VerticalDivider(width: 1),
-        Expanded(child: body),
-      ]),
+      ),
     );
   }
 }
@@ -365,13 +525,16 @@ class _SectionPageState extends State<_SectionPage> {
 }
 
 class _Logo extends StatelessWidget {
-  const _Logo({required this.color});
-  final Color color;
+  const _Logo();
   @override
   Widget build(BuildContext context) => Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-        child: const Icon(Icons.inventory_2, color: Colors.white, size: 20),
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: AppColors.brand,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x4D5EEAD4)),
+        ),
+        child: const Icon(Icons.inventory_2, color: Color(0xFFCCFBF1), size: 24),
       );
 }
