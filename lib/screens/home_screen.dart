@@ -10,7 +10,6 @@ import '../shell.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui.dart';
-import 'equipment_screen.dart';
 import 'expiry_screens.dart';
 import 'expense_screens.dart' show ShareBar;
 import 'item_screens.dart';
@@ -190,11 +189,6 @@ class HomeScreen extends StatelessWidget {
       if (!staff) IconButton(tooltip: tx('Export everything to Excel', 'تصدير كل البيانات إلى إكسل'), onPressed: () => exportExcel(s), icon: const Icon(Icons.table_view_outlined)),
       ChangesBell(store: s),
       SyncBadge(store: s, onTap: () => _push(context, SettingsScreen(store: s))),
-      if (w < 700) ...[
-        IconButton(tooltip: tx('Reserve store', 'مخزن الاحتياط'), onPressed: () => shell.go('Reserve'), icon: const Icon(Icons.warehouse_outlined)),
-        IconButton(tooltip: tx('Equipment', 'المعدات'), onPressed: () => _push(context, EquipmentScreen(store: s)), icon: const Icon(Icons.medical_services_outlined)),
-        IconButton(tooltip: tx('Settings & backup', 'الإعدادات والنسخ الاحتياطي'), onPressed: () => _push(context, SettingsScreen(store: s)), icon: const Icon(Icons.settings_outlined)),
-      ],
     ];
 
     // Cards after the figures, two to a row on wide screens; an odd one out takes the full width.
@@ -223,6 +217,7 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 8),
           // The title row: the store's name and today's date, with the header icons.
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (menuButton(context) case final menu?) Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: menu),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 NameText(s.companyName.isEmpty ? 'قسم التجهيز' : s.companyName,

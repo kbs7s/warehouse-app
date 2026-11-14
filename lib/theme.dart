@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'l10n.dart';
+
 /// Brand colours used across the app (cards, charts, status), from the hospital design guide.
 class AppColors {
   static const brand = Color(0xFF0F766E); // teal-700: the guide's teal-600 is too light for white text (3.7:1)
@@ -48,15 +50,53 @@ Color appAccent = AppColors.brand;
 /// the header's teal, or a darker shade of the chosen colour.
 Color heroColor() => appAccent == accentChoices.first.$3 ? AppColors.header[1] : Color.lerp(appAccent, Colors.black, .25)!;
 
+/// Lets page headers open the side panel: provided by the main screen around the open section.
+class MenuScope extends InheritedWidget {
+  const MenuScope({super.key, required this.onMenu, required super.child});
+  final VoidCallback onMenu;
+
+  static MenuScope? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<MenuScope>();
+
+  @override
+  bool updateShouldNotify(MenuScope old) => old.onMenu != onMenu;
+}
+
+/// The button that opens the side panel, or null where there is none (pages opened on top, which go back instead).
+Widget? menuButton(BuildContext context) {
+  final menu = MenuScope.maybeOf(context);
+  if (menu == null || (ModalRoute.of(context)?.canPop ?? false)) return null;
+  return IconButton(tooltip: tx('Menu', 'القائمة'), onPressed: menu.onMenu, icon: const Icon(Icons.menu));
+}
+
 /// The dark gradient header of every page, with white title and icons.
-class HeaderBar extends AppBar {
-  HeaderBar({super.key, super.leading, super.automaticallyImplyLeading, super.title, List<Widget>? actions, super.bottom, super.centerTitle})
-      : super(
-          actions: actions == null ? null : [for (final a in actions) OnHeader(child: a)],
-          flexibleSpace: const _HeaderGradient(),
-          backgroundColor: AppColors.header[1],
-          foregroundColor: Colors.white,
-        );
+/// On a section's own page (nothing to go back to) it starts with the menu button that opens the side panel.
+class HeaderBar extends StatelessWidget implements PreferredSizeWidget {
+  const HeaderBar({super.key, this.leading, this.automaticallyImplyLeading = true, this.title, this.actions, this.bottom, this.centerTitle});
+  final Widget? leading;
+  final bool automaticallyImplyLeading;
+  final Widget? title;
+  final List<Widget>? actions;
+  final PreferredSizeWidget? bottom;
+  final bool? centerTitle;
+
+  @override
+  Size get preferredSize => Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
+
+  @override
+  Widget build(BuildContext context) {
+    final lead = leading ?? (automaticallyImplyLeading ? menuButton(context) : null);
+    return AppBar(
+      leading: lead,
+      automaticallyImplyLeading: automaticallyImplyLeading,
+      title: title,
+      actions: actions == null ? null : [for (final a in actions!) OnHeader(child: a)],
+      bottom: bottom,
+      centerTitle: centerTitle,
+      flexibleSpace: const _HeaderGradient(),
+      backgroundColor: AppColors.header[1],
+      foregroundColor: Colors.white,
+    );
+  }
 }
 
 class _HeaderGradient extends StatelessWidget {

@@ -35,6 +35,11 @@ void main() {
   }
 
   Future<void> go(WidgetTester t, String section, [String? page]) async {
+    // Phones reach the sections through the side panel behind the menu button.
+    if (find.text(section).hitTestable().evaluate().isEmpty) {
+      await t.tap(find.byTooltip('Menu').first);
+      await t.pumpAndSettle();
+    }
     await t.tap(find.text(section).last);
     await t.pumpAndSettle();
     if (page != null) {
@@ -218,6 +223,10 @@ void main() {
       expect(find.text('صرف إلى قسم'), findsWidgets);
       expect(Directionality.of(t.element(find.byType(HomeShell))), TextDirection.rtl);
       for (final section in ['الصرف', 'المخزون', 'الشهر', 'المشتريات', 'الرئيسية']) {
+        if (find.text(section).hitTestable().evaluate().isEmpty) {
+          await t.tap(find.byTooltip('القائمة').first);
+          await t.pumpAndSettle();
+        }
         await t.tap(find.text(section).last);
         await t.pumpAndSettle();
       }
@@ -467,17 +476,14 @@ void main() {
     expect(copy.receipts.last.fromReserve, isTrue);
   });
 
-  testWidgets('phone: reserve store opens from Home and its count from the Count tab', (t) async {
+  testWidgets('phone: reserve store opens from the side panel and its count from the Count section', (t) async {
     phone(t);
     await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(store: store)));
-    await t.tap(find.byTooltip('Reserve store'));
-    await t.pumpAndSettle();
+    await go(t, 'Reserve');
+    expect(find.byType(Drawer), findsNothing); // the panel closes once a section is picked
     expect(find.text('Move to reserve'), findsOneWidget);
     expect(find.text('Add item to reserve'), findsOneWidget);
-    await t.pageBack();
-    await t.pumpAndSettle();
-    await t.tap(find.text('Count').last);
-    await t.pumpAndSettle();
+    await go(t, 'Count');
     await t.tap(find.widgetWithText(ChoiceChip, 'Reserve store'));
     await t.pumpAndSettle();
     expect(find.text('Reserve count'), findsOneWidget);
