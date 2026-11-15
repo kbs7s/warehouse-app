@@ -38,9 +38,13 @@ Future<void> showPdfSheet(BuildContext context, {required String name, required 
             const Divider(height: 1),
             ListTile(
               enabled: ready,
-              leading: const Icon(Icons.ios_share),
-              title: Text(tx('Send', 'إرسال'), style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(tx('WhatsApp, Telegram, Mail and more', 'واتساب، تيليكرام، البريد وغيرها')),
+              leading: CircleAvatar(
+                backgroundColor: ready ? const Color(0xFF25D366) : t.disabledColor,
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              ),
+              title: Text(tx('Send on WhatsApp', 'إرسال عبر واتساب'), style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(tx('Choose WhatsApp, then the department. Telegram and Mail work too.',
+                  'اختر واتساب ثم القسم. يعمل أيضاً مع تيليكرام والبريد.')),
               onTap: () async {
                 // Nothing may be awaited before this call, or Safari refuses to open the share sheet.
                 final r = shareFile(file, snap.data!, 'application/pdf');
