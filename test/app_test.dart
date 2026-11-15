@@ -604,6 +604,28 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  test('Arabic issue receipt runs over two A4 pages with an Arabic file name', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final ids = [for (final i in store.activeItems) i.id].take(32).toList();
+    final r = Receipt(no: 49, date: '2026-11-15', department: 'عمليات', note: 'جرد', lines: [for (final (k, id) in ids.indexed) ReceiptLine(itemId: id, qty: k + 1)]);
+    isAr = true;
+    final bytes = await buildReceiptPdf(store, r);
+    final name = receiptFileName(r);
+    isAr = false;
+    expect(name, 'وصل صرف 49 - عمليات.pdf');
+    expect(bytes.length, greaterThan(10000));
+    File('build/receipt-49-ar.pdf')
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(bytes);
+    // 25 items and the signatures fit on one A4 page.
+    final r25 = Receipt(no: 50, date: '2026-11-15', department: 'عمليات', lines: [for (final id in ids.take(25)) ReceiptLine(itemId: id, qty: 3)]);
+    isAr = true;
+    final one = await buildReceiptPdf(store, r25);
+    isAr = false;
+    File('build/receipt-50-ar.pdf').writeAsBytesSync(one);
+    expect(RegExp(r'/Type\s*/Page\b').allMatches(latin1.decode(one)).length, 1);
+  });
+
   test('receipt and invoice PDFs build with Arabic names', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final bytes = await buildReceiptPdf(store, store.receipts.firstWhere((r) => r.no == 20));

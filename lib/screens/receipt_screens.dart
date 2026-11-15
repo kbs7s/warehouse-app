@@ -92,7 +92,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
 
 /// The send / print / save sheet for an issue receipt's PDF.
 Future<void> sendReceipt(BuildContext context, WarehouseStore store, Receipt r) => showPdfSheet(context,
-    name: 'Receipt-${r.no}', make: () => buildReceiptPdf(store, r), print: () => shareReceiptPdf(store, r));
+    name: receiptFileName(r), make: () => buildReceiptPdf(store, r), print: () => shareReceiptPdf(store, r));
 
 void openReceipt(BuildContext context, WarehouseStore store, Receipt? r, {bool fromReserve = false}) => Navigator.of(context).push(
   MaterialPageRoute(
