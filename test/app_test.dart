@@ -617,6 +617,13 @@ void main() {
     File('build/receipt-49-ar.pdf')
       ..createSync(recursive: true)
       ..writeAsBytesSync(bytes);
+    // 25 items and the signatures fit on one A4 page.
+    final r25 = Receipt(no: 50, date: '2026-11-15', department: 'عمليات', lines: [for (final id in ids.take(25)) ReceiptLine(itemId: id, qty: 3)]);
+    isAr = true;
+    final one = await buildReceiptPdf(store, r25);
+    isAr = false;
+    File('build/receipt-50-ar.pdf').writeAsBytesSync(one);
+    expect(RegExp(r'/Type\s*/Page\b').allMatches(latin1.decode(one)).length, 1);
   });
 
   test('receipt and invoice PDFs build with Arabic names', () async {

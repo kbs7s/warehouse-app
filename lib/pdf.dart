@@ -73,22 +73,23 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
   pw.Widget tx_(String v, pw.TextStyle style) => _name(v, style: style);
   final start = isAr ? pw.Alignment.centerRight : pw.Alignment.centerLeft;
 
+  // A compact band: store, title, number on one line over a single rule.
   pw.Widget header(pw.Context c) {
     final first = c.pageNumber == 1;
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 14),
+      padding: const pw.EdgeInsets.only(bottom: 8),
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
           pw.Expanded(
             child: pw.Row(children: [
               pw.Container(
-                width: 24,
-                height: 24,
+                width: 20,
+                height: 20,
                 alignment: pw.Alignment.center,
-                decoration: pw.BoxDecoration(color: _ink, borderRadius: pw.BorderRadius.circular(5)),
-                child: pw.Text('+', style: st(title, bold: true, color: PdfColors.white)),
+                decoration: pw.BoxDecoration(color: _ink, borderRadius: pw.BorderRadius.circular(4)),
+                child: pw.Text('+', style: st(body + 2, bold: true, color: PdfColors.white)),
               ),
-              pw.SizedBox(width: 8),
+              pw.SizedBox(width: 7),
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                 tx_(company, st(body + 1, bold: true, color: _ink)),
                 pw.Text(tx('Stores and medical supplies', 'إدارة المخازن والمستلزمات الطبية'), style: st(label, color: _muted)),
@@ -96,25 +97,24 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
             ]),
           ),
           pw.Container(
-            width: 120,
-            padding: const pw.EdgeInsets.symmetric(vertical: 4),
-            decoration: pw.BoxDecoration(color: _tealSoft, border: pw.Border.all(color: _teal, width: .8), borderRadius: pw.BorderRadius.circular(5)),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            decoration: pw.BoxDecoration(color: _tealSoft, border: pw.Border.all(color: _teal, width: .8), borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(children: [
               pw.Text(tx('Issue receipt', 'وصل صرف'), style: st(title, bold: true, color: _ink)),
-              pw.Text(first ? tx('Store issue document', 'مستند إخراج مخزني') : tx('Continued', 'تابع المواد المصروفة'), style: st(label, color: _teal)),
+              if (!first) pw.Text(tx('Continued', 'تابع'), style: st(label, color: _teal)),
             ]),
           ),
           pw.Expanded(
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text(tx('Receipt no.', 'رقم الوصل'), style: st(label, color: _muted)),
+            child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+              pw.Text('${tx('Receipt no.', 'رقم الوصل')}  ', style: st(label, color: _muted)),
               pw.Text('#${r.no}', style: st(title, bold: true, color: _ink), textDirection: pw.TextDirection.ltr),
             ]),
           ),
         ]),
-        pw.SizedBox(height: 10),
-        pw.Container(height: 1.6, color: _ink),
+        pw.SizedBox(height: 6),
+        pw.Container(height: 1.4, color: _ink),
         if (!first) ...[
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: 6),
           pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Row(children: [
               pw.Text('${tx('Department', 'القسم')}: ', style: st(body, color: _muted)),
@@ -140,16 +140,16 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
   final receiver = r.customer?.trim() ?? '';
   final blank = pw.Container(height: 12, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _muted, width: .5, style: pw.BorderStyle.dashed))));
 
-  const cell = pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4.2);
+  const cell = pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2.0);
   pw.Widget td(pw.Widget w, {pw.Alignment align = pw.Alignment.center}) => pw.Container(padding: cell, alignment: align, child: w);
 
   doc.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
     textDirection: _dir,
-    margin: const pw.EdgeInsets.fromLTRB(42, 36, 42, 28),
+    margin: const pw.EdgeInsets.fromLTRB(36, 26, 36, 18),
     header: header,
     footer: (c) => pw.Padding(
-      padding: const pw.EdgeInsets.only(top: 10),
+      padding: const pw.EdgeInsets.only(top: 6),
       child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
         tx_(company, st(label, color: _muted)),
         pw.Text(tx('Receipt ${r.no} · page ${c.pageNumber} of ${c.pagesCount}', 'وصل ${r.no} · صفحة ${c.pageNumber} من ${c.pagesCount}'), style: st(label, color: _muted)),
@@ -157,26 +157,21 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
     ),
     build: (_) => [
       pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: pw.BoxDecoration(color: _tint, borderRadius: pw.BorderRadius.circular(5)),
-        child: pw.Column(children: [
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(child: fieldText(tx('Department', 'القسم المستفيد'), dept)),
-            pw.Expanded(child: fieldText(tx('Issue date', 'تاريخ الصرف'), date)),
-            pw.Expanded(child: fieldText(tx('Items', 'عدد المواد'), tx('${r.lines.length} items', '${r.lines.length} مادة'))),
-          ]),
-          pw.SizedBox(height: 10),
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(child: fieldText(tx('Note', 'ملاحظة'), note.isEmpty ? '—' : note)),
-            pw.Expanded(
-                flex: 2,
-                child: receiver.isEmpty
-                    ? field(tx('Received by (name)', 'اسم المستلم'), pw.Padding(padding: const pw.EdgeInsetsDirectional.only(end: 40), child: blank))
-                    : fieldText(tx('Received by (name)', 'اسم المستلم'), receiver)),
-          ]),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: pw.BoxDecoration(color: _tint, borderRadius: pw.BorderRadius.circular(4)),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(flex: 3, child: fieldText(tx('Department', 'القسم المستفيد'), dept)),
+          pw.Expanded(flex: 3, child: fieldText(tx('Issue date', 'تاريخ الصرف'), date)),
+          pw.Expanded(flex: 2, child: fieldText(tx('Items', 'عدد المواد'), tx('${r.lines.length} items', '${r.lines.length} مادة'))),
+          pw.Expanded(flex: 2, child: fieldText(tx('Note', 'ملاحظة'), note.isEmpty ? '—' : note)),
+          pw.Expanded(
+              flex: 4,
+              child: receiver.isEmpty
+                  ? field(tx('Received by (name)', 'اسم المستلم'), pw.Padding(padding: const pw.EdgeInsets.only(top: 2), child: blank))
+                  : fieldText(tx('Received by (name)', 'اسم المستلم'), receiver)),
         ]),
       ),
-      pw.SizedBox(height: 14),
+      pw.SizedBox(height: 8),
       pw.Table(
         border: const pw.TableBorder(horizontalInside: pw.BorderSide(color: _line, width: .6), bottom: pw.BorderSide(color: _line, width: .6)),
         columnWidths: _widths(const [
@@ -208,14 +203,14 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
             ),
         ],
       ),
-      pw.SizedBox(height: 34),
+      pw.SizedBox(height: 12),
       pw.Row(children: [
         for (final (i, t) in [tx('Issued by (store keeper)', 'المُسلِّم (أمين المخزن)'), tx('Received by', 'المستلم')].indexed) ...[
           if (i > 0) pw.SizedBox(width: 40),
           pw.Expanded(
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text(t, style: st(body, bold: true, color: _ink)),
-              pw.SizedBox(height: 26),
+              pw.SizedBox(height: 18),
               pw.Container(height: .6, color: _muted),
               pw.SizedBox(height: 3),
               pw.Text(tx('Name and signature', 'الاسم والتوقيع'), style: st(label, color: _muted)),
