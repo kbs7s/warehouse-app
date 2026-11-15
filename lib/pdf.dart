@@ -47,168 +47,144 @@ pw.Widget _name(String s, {pw.TextStyle? style, pw.TextAlign? align}) {
       textDirection: pw.TextDirection.rtl);
 }
 
-// Issue receipt colours: deep teal ink, teal accent, soft row tint.
+// Issue receipt colours: deep teal ink, teal accent, quiet greys.
 const _ink = PdfColor.fromInt(0xFF0F3D3E);
 const _teal = PdfColor.fromInt(0xFF0D9488);
 const _tealSoft = PdfColor.fromInt(0xFFF0FDFA);
 const _muted = PdfColor.fromInt(0xFF64748B);
 const _line = PdfColor.fromInt(0xFFE2E8F0);
-const _lineDark = PdfColor.fromInt(0xFFCBD5E1);
-const _tint = PdfColor.fromInt(0xFFF8FAFC);
+const _tint = PdfColor.fromInt(0xFFF6F8FA);
 const _text = PdfColor.fromInt(0xFF1E293B);
 
 /// The issue receipt, laid out as an A4 form ready to print or send to the department on WhatsApp.
+/// Three type sizes: 7.5 for labels, 9 for the body and table, 13 for the title and number.
 Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
-  final doc = pw.Document(theme: await _pdfTheme(), title: tx('Issue receipt ${r.no}', 'وصل صرف ${r.no}'));
+  final doc = pw.Document(
+      theme: await _pdfTheme(),
+      title: tx('Issue receipt ${r.no}', 'وصل صرف ${r.no}'));
   final company = store.companyName.isEmpty ? 'قسم التجهيز' : store.companyName;
   final dept = r.department ?? '—';
   final date = fmtDate(r.date);
   final note = [if (r.fromReserve) tx('From the reserve store', 'من مخزن الاحتياط'), if (r.note != null && r.note!.trim().isNotEmpty) r.note!.trim()].join(' · ');
+
+  const label = 7.5, body = 9.0, title = 13.0;
   pw.TextStyle st(double size, {bool bold = false, PdfColor color = _text}) =>
-      pw.TextStyle(fontSize: size, color: color, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
+      pw.TextStyle(fontSize: size, color: color, lineSpacing: 0, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
+  pw.Widget tx_(String v, pw.TextStyle style) => _name(v, style: style);
+  final start = isAr ? pw.Alignment.centerRight : pw.Alignment.centerLeft;
 
   pw.Widget header(pw.Context c) {
     final first = c.pageNumber == 1;
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-      pw.Container(
-        padding: const pw.EdgeInsets.only(bottom: 10),
-        decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 2.5))),
-        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 14),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
           pw.Expanded(
             child: pw.Row(children: [
               pw.Container(
-                width: 34,
-                height: 34,
+                width: 24,
+                height: 24,
                 alignment: pw.Alignment.center,
-                decoration: pw.BoxDecoration(color: _ink, borderRadius: pw.BorderRadius.circular(7)),
-                child: pw.Text('+', style: st(18, bold: true, color: PdfColors.white)),
+                decoration: pw.BoxDecoration(color: _ink, borderRadius: pw.BorderRadius.circular(5)),
+                child: pw.Text('+', style: st(title, bold: true, color: PdfColors.white)),
               ),
-              pw.SizedBox(width: 9),
+              pw.SizedBox(width: 8),
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                _name(company, style: st(15, bold: true, color: _ink)),
-                pw.Text(tx('Stores and medical supplies', 'إدارة المخازن والمستلزمات الطبية'), style: st(8.5, color: _muted)),
+                tx_(company, st(body + 1, bold: true, color: _ink)),
+                pw.Text(tx('Stores and medical supplies', 'إدارة المخازن والمستلزمات الطبية'), style: st(label, color: _muted)),
               ]),
             ]),
           ),
           pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-            decoration: pw.BoxDecoration(color: _tealSoft, border: pw.Border.all(color: _teal, width: 1.2), borderRadius: pw.BorderRadius.circular(6)),
+            width: 120,
+            padding: const pw.EdgeInsets.symmetric(vertical: 4),
+            decoration: pw.BoxDecoration(color: _tealSoft, border: pw.Border.all(color: _teal, width: .8), borderRadius: pw.BorderRadius.circular(5)),
             child: pw.Column(children: [
-              pw.Text(tx('Issue receipt', 'وصل صرف'), style: st(15, bold: true, color: _ink)),
-              pw.Text(first ? tx('Store issue document', 'مستند إخراج مخزني') : tx('Items issued, continued', 'تابع المواد المصروفة'),
-                  style: st(8.5, bold: true, color: _teal)),
+              pw.Text(tx('Issue receipt', 'وصل صرف'), style: st(title, bold: true, color: _ink)),
+              pw.Text(first ? tx('Store issue document', 'مستند إخراج مخزني') : tx('Continued', 'تابع المواد المصروفة'), style: st(label, color: _teal)),
             ]),
           ),
           pw.Expanded(
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text(tx('Receipt no.', 'رقم الوصل'), style: st(8.5, color: _muted)),
-              pw.Text('#${r.no}', style: st(19, bold: true, color: _ink), textDirection: pw.TextDirection.ltr),
+              pw.Text(tx('Receipt no.', 'رقم الوصل'), style: st(label, color: _muted)),
+              pw.Text('#${r.no}', style: st(title, bold: true, color: _ink), textDirection: pw.TextDirection.ltr),
             ]),
           ),
         ]),
-      ),
-      pw.SizedBox(height: 12),
-      if (!first) ...[
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: pw.BoxDecoration(
-            color: _tint,
-            border: pw.Border(
-              top: const pw.BorderSide(color: _line),
-              bottom: const pw.BorderSide(color: _line),
-              left: pw.BorderSide(color: isAr ? _line : _ink, width: isAr ? 1 : 3),
-              right: pw.BorderSide(color: isAr ? _ink : _line, width: isAr ? 3 : 1),
-            ),
-          ),
-          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.SizedBox(height: 10),
+        pw.Container(height: 1.6, color: _ink),
+        if (!first) ...[
+          pw.SizedBox(height: 8),
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Row(children: [
-              pw.Text('${tx('Department', 'القسم')}: ', style: st(9.5, bold: true, color: _ink)),
-              _name(dept, style: st(9.5, bold: true, color: _ink)),
-              if (note.isNotEmpty) ...[
-                pw.Text('  |  ${tx('Note', 'ملاحظة')}: ', style: st(9.5, bold: true, color: _ink)),
-                _name(note, style: st(9.5, bold: true, color: _ink)),
-              ],
+              pw.Text('${tx('Department', 'القسم')}: ', style: st(body, color: _muted)),
+              tx_(dept, st(body, bold: true)),
             ]),
-            pw.Text('${tx('Date', 'التاريخ')}: $date', style: st(9.5, bold: true, color: _ink)),
+            pw.Row(children: [
+              pw.Text('${tx('Date', 'التاريخ')}: ', style: st(body, color: _muted)),
+              pw.Text(date, style: st(body, bold: true)),
+            ]),
           ]),
-        ),
-        pw.SizedBox(height: 12),
-      ],
-    ]);
+        ],
+      ]),
+    );
   }
 
-  pw.Widget meta(String label, pw.Widget value) => pw.Container(
-        padding: pw.EdgeInsetsDirectional.only(start: 8),
-        decoration: pw.BoxDecoration(
-            border: pw.Border(
-                left: isAr ? pw.BorderSide.none : const pw.BorderSide(color: _teal, width: 2.5),
-                right: isAr ? const pw.BorderSide(color: _teal, width: 2.5) : pw.BorderSide.none)),
-        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Text(label, style: st(8.5, color: _muted)),
-          pw.SizedBox(height: 1),
-          value,
-        ]),
-      );
-  pw.Widget metaText(String label, String value) => meta(label, _name(value, style: st(11, bold: true)));
-  final blankLine = pw.Container(
-      height: 16,
-      margin: const pw.EdgeInsetsDirectional.only(end: 30),
-      decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _lineDark, style: pw.BorderStyle.dashed))));
+  // One label over one value; every field starts on the same edge.
+  pw.Widget field(String l, pw.Widget v) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(l, style: st(label, color: _muted)),
+        pw.SizedBox(height: 2),
+        v,
+      ]);
+  pw.Widget fieldText(String l, String v) => field(l, tx_(v, st(body, bold: true)));
+  final receiver = r.customer?.trim() ?? '';
+  final blank = pw.Container(height: 12, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _muted, width: .5, style: pw.BorderStyle.dashed))));
 
-  const cell = pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2.5);
+  const cell = pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4.2);
   pw.Widget td(pw.Widget w, {pw.Alignment align = pw.Alignment.center}) => pw.Container(padding: cell, alignment: align, child: w);
-  final itemAlign = isAr ? pw.Alignment.centerRight : pw.Alignment.centerLeft;
 
   doc.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
     textDirection: _dir,
-    margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24),
+    margin: const pw.EdgeInsets.fromLTRB(42, 36, 42, 28),
     header: header,
-    footer: (c) => pw.Container(
-      margin: const pw.EdgeInsets.only(top: 10),
-      padding: const pw.EdgeInsets.only(top: 6),
-      decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: _lineDark, width: .7))),
+    footer: (c) => pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 10),
       child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-        pw.Row(children: [_name(company, style: st(8.5, color: _muted)), pw.Text(tx(' — store system', ' — نظام إدارة المخازن'), style: st(8.5, color: _muted))]),
-        pw.Text(tx('Receipt ${r.no} — page ${c.pageNumber} of ${c.pagesCount}', 'وصل رقم ${r.no} — صفحة\u00A0${c.pageNumber}\u00A0من\u00A0${c.pagesCount}'),
-            style: st(8.5, color: _muted)),
+        tx_(company, st(label, color: _muted)),
+        pw.Text(tx('Receipt ${r.no} · page ${c.pageNumber} of ${c.pagesCount}', 'وصل ${r.no} · صفحة ${c.pageNumber} من ${c.pagesCount}'), style: st(label, color: _muted)),
       ]),
     ),
     build: (_) => [
       pw.Container(
-        padding: const pw.EdgeInsets.fromLTRB(11, 9, 11, 9),
-        decoration: pw.BoxDecoration(color: _tint, border: pw.Border.all(color: _line), borderRadius: pw.BorderRadius.circular(6)),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: pw.BoxDecoration(color: _tint, borderRadius: pw.BorderRadius.circular(5)),
         child: pw.Column(children: [
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(child: metaText(tx('Department', 'القسم المستفيد'), dept)),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: metaText(tx('Issue date', 'تاريخ الصرف'), date)),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: metaText(tx('Items', 'عدد المواد الكلي'), tx('${r.lines.length} items', '${r.lines.length} مادة'))),
+            pw.Expanded(child: fieldText(tx('Department', 'القسم المستفيد'), dept)),
+            pw.Expanded(child: fieldText(tx('Issue date', 'تاريخ الصرف'), date)),
+            pw.Expanded(child: fieldText(tx('Items', 'عدد المواد'), tx('${r.lines.length} items', '${r.lines.length} مادة'))),
           ]),
-          pw.SizedBox(height: 9),
+          pw.SizedBox(height: 10),
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(child: metaText(tx('Note', 'ملاحظة'), note.isEmpty ? '—' : note)),
-            pw.SizedBox(width: 8),
+            pw.Expanded(child: fieldText(tx('Note', 'ملاحظة'), note.isEmpty ? '—' : note)),
             pw.Expanded(
                 flex: 2,
-                child: r.customer == null || r.customer!.trim().isEmpty
-                    ? meta(tx('Received by (name)', 'اسم المستلم'), blankLine)
-                    : metaText(tx('Received by (name)', 'اسم المستلم'), r.customer!)),
+                child: receiver.isEmpty
+                    ? field(tx('Received by (name)', 'اسم المستلم'), pw.Padding(padding: const pw.EdgeInsetsDirectional.only(end: 40), child: blank))
+                    : fieldText(tx('Received by (name)', 'اسم المستلم'), receiver)),
           ]),
         ]),
       ),
       pw.SizedBox(height: 14),
       pw.Table(
-        border: const pw.TableBorder(
-            left: pw.BorderSide(color: _line), right: pw.BorderSide(color: _line), bottom: pw.BorderSide(color: _line),
-            horizontalInside: pw.BorderSide(color: _line), verticalInside: pw.BorderSide(color: _line)),
+        border: const pw.TableBorder(horizontalInside: pw.BorderSide(color: _line, width: .6), bottom: pw.BorderSide(color: _line, width: .6)),
         columnWidths: _widths(const [
-          pw.FixedColumnWidth(30),
-          pw.FixedColumnWidth(58),
+          pw.FixedColumnWidth(26),
+          pw.FixedColumnWidth(52),
           pw.FlexColumnWidth(),
-          pw.FixedColumnWidth(62),
-          pw.FixedColumnWidth(76),
+          pw.FixedColumnWidth(56),
+          pw.FixedColumnWidth(70),
         ]),
         children: [
           pw.TableRow(
@@ -216,46 +192,37 @@ Future<Uint8List> buildReceiptPdf(WarehouseStore store, Receipt r) async {
             decoration: const pw.BoxDecoration(color: _ink),
             children: _cols([
               for (final (i, h) in ['#', tx('Code', 'الرمز'), tx('Item', 'المادة'), tx('Qty', 'الكمية'), tx('Unit', 'الوحدة')].indexed)
-                td(pw.Text(h, style: st(9.5, bold: true, color: PdfColors.white)), align: i == 2 ? itemAlign : pw.Alignment.center),
+                td(pw.Text(h, style: st(label + .5, bold: true, color: PdfColors.white)), align: i == 2 ? start : pw.Alignment.center),
             ]),
           ),
           for (final (i, l) in r.lines.indexed)
             pw.TableRow(
-              decoration: pw.BoxDecoration(color: i.isOdd ? _tint : PdfColors.white),
+              decoration: i.isOdd ? const pw.BoxDecoration(color: _tint) : null,
               children: _cols([
-                td(pw.Text('${i + 1}', style: st(9.5, bold: true, color: _muted))),
-                td(pw.Text(l.itemId, style: st(9.5, bold: true, color: _ink), textDirection: pw.TextDirection.ltr)),
-                td(_name(store.item(l.itemId)?.name ?? l.itemId, style: st(10.5, bold: true)), align: itemAlign),
-                td(pw.Text(fmtQty(l.qty), style: st(11, bold: true, color: _ink), textDirection: pw.TextDirection.ltr)),
-                td(_name(store.item(l.itemId)?.unit ?? '', style: st(9.5, color: _muted))),
+                td(pw.Text('${i + 1}', style: st(label, color: _muted))),
+                td(pw.Text(l.itemId, style: st(label + .5, color: _muted), textDirection: pw.TextDirection.ltr)),
+                td(tx_(store.item(l.itemId)?.name ?? l.itemId, st(body, bold: true)), align: start),
+                td(pw.Text(fmtQty(l.qty), style: st(body, bold: true, color: _ink), textDirection: pw.TextDirection.ltr)),
+                td(tx_(store.item(l.itemId)?.unit ?? '', st(label + .5, color: _muted))),
               ]),
             ),
         ],
       ),
-      pw.SizedBox(height: 18),
-      pw.Container(
-        padding: const pw.EdgeInsets.only(top: 12),
-        decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: _line, width: 1.5))),
-        child: pw.Row(children: [
-          for (final (i, (title, sub)) in [
-            (tx('Issued by (store keeper)', 'المُسلِّم (أمين المخزن)'), tx('Name and signature', 'الاسم والتوقيع')),
-            (tx('Received by', 'المستلم'), tx('Name and signature', 'الاسم والتوقيع')),
-          ].indexed) ...[
-            if (i > 0) pw.SizedBox(width: 30),
-            pw.Expanded(
-              child: pw.Container(
-                padding: const pw.EdgeInsets.fromLTRB(12, 9, 12, 30),
-                decoration: pw.BoxDecoration(color: _tint, border: pw.Border.all(color: _line), borderRadius: pw.BorderRadius.circular(6)),
-                child: pw.Column(children: [
-                  pw.Text(title, style: st(10.5, bold: true, color: _ink)),
-                  pw.SizedBox(height: 2),
-                  pw.Text(sub, style: st(8.5, color: _muted)),
-                ]),
-              ),
-            ),
-          ],
-        ]),
-      ),
+      pw.SizedBox(height: 34),
+      pw.Row(children: [
+        for (final (i, t) in [tx('Issued by (store keeper)', 'المُسلِّم (أمين المخزن)'), tx('Received by', 'المستلم')].indexed) ...[
+          if (i > 0) pw.SizedBox(width: 40),
+          pw.Expanded(
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(t, style: st(body, bold: true, color: _ink)),
+              pw.SizedBox(height: 26),
+              pw.Container(height: .6, color: _muted),
+              pw.SizedBox(height: 3),
+              pw.Text(tx('Name and signature', 'الاسم والتوقيع'), style: st(label, color: _muted)),
+            ]),
+          ),
+        ],
+      ]),
     ],
   ));
   return doc.save();
