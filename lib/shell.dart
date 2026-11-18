@@ -26,6 +26,7 @@ import 'screens/reserve_screens.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stock_screen.dart';
 import 'screens/supplier_screens.dart';
+import 'screens/weekly_screen.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -137,6 +138,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
       ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
       ('Requests', 'طلبات الأقسام', (s, _) => RequestsScreen(store: s)),
       ('Departments', 'الأقسام', (s, _) => DepartmentsScreen(store: s)),
+      ('Weekly report', 'التقرير الأسبوعي', (s, _) => WeeklyReportScreen(store: s)),
     ]),
     _Section('Stock', 'المخزون', Icons.inventory_2_outlined, Icons.inventory_2, [
       ('Items', 'المواد', (s, _) => StockScreen(store: s)),
@@ -183,6 +185,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
     _Section('Issue', 'الصرف', Icons.outbox_outlined, Icons.outbox, [
       ('Issues', 'وصولات الصرف', (s, _) => ReceiptsScreen(store: s)),
       ('Requests', 'طلبات الأقسام', (s, _) => RequestsScreen(store: s)),
+      ('Weekly report', 'التقرير الأسبوعي', (s, _) => WeeklyReportScreen(store: s)),
     ]),
     _Section('Account', 'الحساب', Icons.person_outline, Icons.person, [
       ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
@@ -193,6 +196,7 @@ class _HomeShellState extends State<HomeShell> implements Shell {
   static final _deptSections = <_Section>[
     _Section('Requests', 'الطلبات', Icons.assignment_outlined, Icons.assignment, [
       ('Requests', 'طلباتي', (s, _) => RequestsScreen(store: s)),
+      ('Weekly report', 'التقرير الأسبوعي', (s, _) => WeeklyReportScreen(store: s)),
     ]),
     _Section('Account', 'الحساب', Icons.person_outline, Icons.person, [
       ('Account', 'الحساب', (s, _) => AccountScreen(store: s)),
